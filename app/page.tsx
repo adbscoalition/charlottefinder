@@ -247,6 +247,13 @@ export default function Home() {
     setError("");
   };
 
+  const setSimulatorPoint = (coords: Coordinates) => {
+    setSimLatInput(coords.lat.toString());
+    setSimLonInput(coords.lon.toString());
+    setSimulatedPosition(coords);
+    setError("");
+  };
+
   return (
     <main className="page">
       <h1
@@ -275,6 +282,9 @@ export default function Home() {
             <strong>Main target (Charlotte):</strong> {CHARLOTTE.lat.toFixed(12)}, {CHARLOTTE.lon.toFixed(12)}
           </p>
           <p>
+            <strong>Active point:</strong> {activePosition?.lat.toFixed(12)}, {activePosition?.lon.toFixed(12)}
+          </p>
+          <p>
             <strong>Bearing to Charlotte:</strong> {toCharlotte.bearing.toFixed(2)}°
           </p>
           <p>
@@ -291,6 +301,14 @@ export default function Home() {
       {simulatorOpen && (
         <form onSubmit={submitSimulator} className="teleport">
           <h2>Location Simulator</h2>
+          <div className="preset-row">
+            <button type="button" onClick={() => setSimulatorPoint(CHARLOTTE)}>
+              Use Charlotte
+            </button>
+            <button type="button" onClick={() => setSimulatorPoint(EASTER_EGG)}>
+              Use Vancouver Easter Egg
+            </button>
+          </div>
           <label>
             Latitude
             <input value={simLatInput} onChange={(e) => setSimLatInput(e.target.value)} placeholder="35.22867647481079" />

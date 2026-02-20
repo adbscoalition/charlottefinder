@@ -83,6 +83,12 @@ h1 {
   font-size: 0.95rem;
 }
 
+.preset-row {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: 1fr;
+}
+
 input,
 button {
   border-radius: 8px;
