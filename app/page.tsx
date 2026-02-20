@@ -18,11 +18,23 @@ type MagneticSource = {
   }>;
 };
 
+type CompassTarget = {
+  label: string;
+  center: Coordinates;
+};
+
 const CHARLOTTE: Coordinates = { lat: 35.22867647481079, lon: -80.84490976473366 };
 const EASTER_EGG: Coordinates = { lat: 49.2729341959022, lon: -123.06941193669999 }; // Secret Vancouver anomaly
 const CHARLOTTE_MI: Coordinates = { lat: 42.56318196348821, lon: -84.83584647437215 };
 const PACIFIC_FIELD: Coordinates = { lat: 53.255510249854304, lon: -132.08947116604432 };
 const CARIBBEAN_FIELD: Coordinates = { lat: 18.34185490966226, lon: -64.9316281681369 };
+
+const COMPASS_TARGETS: CompassTarget[] = [
+  { label: "Charlotte, NC", center: CHARLOTTE },
+  { label: "Charlotte, MI", center: CHARLOTTE_MI },
+  { label: "Haida Gwaii Islands", center: PACIFIC_FIELD },
+  { label: "Charlotte Amalie, US Virgin Islands", center: CARIBBEAN_FIELD }
+];
 
 const MAGNETIC_SOURCES: MagneticSource[] = [
   {
@@ -144,6 +156,7 @@ export default function Home() {
   const [simLatInput, setSimLatInput] = useState("");
   const [simLonInput, setSimLonInput] = useState("");
   const [simulatedPosition, setSimulatedPosition] = useState<Coordinates | null>(null);
+  const [activeTargetIndex, setActiveTargetIndex] = useState(0);
 
   const compassDisabled = simulatedPosition !== null;
   const activePosition = simulatedPosition ?? position;
@@ -187,12 +200,14 @@ export default function Home() {
     };
   }, [spoofActive]);
 
-  const toCharlotte = useMemo(() => {
+  const activeTarget = COMPASS_TARGETS[activeTargetIndex] ?? COMPASS_TARGETS[0];
+
+  const toTarget = useMemo(() => {
     if (!activePosition) return null;
-    const distance = distanceKm(activePosition, CHARLOTTE);
-    const bearing = bearingDeg(activePosition, CHARLOTTE);
+    const distance = distanceKm(activePosition, activeTarget.center);
+    const bearing = bearingDeg(activePosition, activeTarget.center);
     return { distance, bearing };
-  }, [activePosition]);
+  }, [activePosition, activeTarget]);
 
   const magneticBreakdown = useMemo(() => {
     if (!activePosition) return [] as Array<{ name: string; value: number }>;
@@ -207,7 +222,7 @@ export default function Home() {
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || !toCharlotte) return;
+    if (!canvas || !toTarget) return;
 
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
@@ -246,7 +261,7 @@ export default function Home() {
     ctx.font = "600 16px Inter, sans-serif";
     ctx.fillText("N", center - 7, center - radius + 20);
 
-    const targetAngle = toRad(toCharlotte.bearing - heading - 90);
+    const targetAngle = toRad(toTarget.bearing - heading - 90);
     const tipX = center + Math.cos(targetAngle) * (radius - 10);
     const tipY = center + Math.sin(targetAngle) * (radius - 10);
 
@@ -264,8 +279,8 @@ export default function Home() {
 
     ctx.fillStyle = "#bfdbfe";
     ctx.font = "500 14px Inter, sans-serif";
-    ctx.fillText("Charlotte, NC", center - 45, center + radius + 25);
-  }, [compassDisabled, heading, toCharlotte]);
+    ctx.fillText(activeTarget.label, center - 70, center + radius + 25);
+  }, [activeTarget.label, compassDisabled, heading, toTarget]);
 
   const submitTeleport = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -338,28 +353,36 @@ export default function Home() {
 
       <canvas ref={canvasRef} className="compass" />
 
-      {toCharlotte && (
+      <section className="target-selector">
+        {COMPASS_TARGETS.map((target, index) => (
+          <button
+            key={target.label}
+            type="button"
+            className={index === activeTargetIndex ? "target-active" : ""}
+            onClick={() => setActiveTargetIndex(index)}
+          >
+            {target.label}
+          </button>
+        ))}
+      </section>
+
+      {toTarget && (
         <section className="stats">
           <p>
-            <strong>Main target (Charlotte):</strong> {CHARLOTTE.lat.toFixed(12)}, {CHARLOTTE.lon.toFixed(12)}
+            <strong>Compass target:</strong> {activeTarget.label}
           </p>
           <p>
             <strong>Active point:</strong> {activePosition?.lat.toFixed(12)}, {activePosition?.lon.toFixed(12)}
           </p>
           <p>
-            <strong>Bearing to Charlotte:</strong> {toCharlotte.bearing.toFixed(2)}°
+            <strong>Bearing:</strong> {toTarget.bearing.toFixed(2)}°
           </p>
           <p>
-            <strong>Distance:</strong> {toCharlotte.distance.toFixed(2)} km
+            <strong>Distance:</strong> {toTarget.distance.toFixed(2)} km
           </p>
           <p>
-            <strong>Total Magnetic Field (sum):</strong> {formatField(fieldStrength)}
+            <strong>CLT Magnetic FIeld™:</strong> {formatField(fieldStrength)}
           </p>
-          {magneticBreakdown.map((item) => (
-            <p key={item.name}>
-              <strong>{item.name}:</strong> {formatField(item.value)}
-            </p>
-          ))}
           {simulatedPosition && <p className="badge">Simulator active (compass disabled)</p>}
           {spoofActive && <p className="badge">Secret teleport spoof active</p>}
         </section>
@@ -375,14 +398,11 @@ export default function Home() {
             <button type="button" onClick={() => setSimulatorPoint(CHARLOTTE_MI)}>
               Use Charlotte, MI Field
             </button>
-            <button type="button" onClick={() => setSimulatorPoint(EASTER_EGG)}>
-              Use Vancouver Easter Egg
-            </button>
             <button type="button" onClick={() => setSimulatorPoint(PACIFIC_FIELD)}>
-              Use Pacific Field
+              Use Haida Gwaii Islands
             </button>
             <button type="button" onClick={() => setSimulatorPoint(CARIBBEAN_FIELD)}>
-              Use Caribbean Field
+              Use Charlotte Amalie, US Virgin Islands
             </button>
           </div>
           <label>

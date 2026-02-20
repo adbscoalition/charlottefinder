@@ -39,6 +39,19 @@ h1 {
   margin-bottom: 1rem;
 }
 
+.target-selector {
+  margin-bottom: 1rem;
+  width: min(500px, 92vw);
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.target-active {
+  border-color: #f43f5e;
+  box-shadow: 0 0 0 1px #f43f5e;
+}
+
 .compass {
   width: min(320px, 90vw);
   height: auto;
@@ -90,6 +103,7 @@ h1 {
 }
 
 @media (max-width: 520px) {
+  .target-selector,
   .preset-row {
     grid-template-columns: 1fr;
   }
