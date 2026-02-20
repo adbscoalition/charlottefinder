@@ -7,8 +7,75 @@ type Coordinates = {
   lon: number;
 };
 
+type MagneticSource = {
+  name: string;
+  center: Coordinates;
+  bands: Array<{
+    startKm: number;
+    endKm: number;
+    startValue: number;
+    endValue: number;
+  }>;
+};
+
 const CHARLOTTE: Coordinates = { lat: 35.22867647481079, lon: -80.84490976473366 };
 const EASTER_EGG: Coordinates = { lat: 49.2729341959022, lon: -123.06941193669999 }; // Secret Vancouver anomaly
+const CHARLOTTE_MI: Coordinates = { lat: 42.56318196348821, lon: -84.83584647437215 };
+const PACIFIC_FIELD: Coordinates = { lat: 53.255510249854304, lon: -132.08947116604432 };
+const CARIBBEAN_FIELD: Coordinates = { lat: 18.34185490966226, lon: -64.9316281681369 };
+
+const MAGNETIC_SOURCES: MagneticSource[] = [
+  {
+    name: "Charlotte, NC",
+    center: CHARLOTTE,
+    bands: [
+      { startKm: 0, endKm: 10, startValue: 1000, endValue: 1000 },
+      { startKm: 10, endKm: 100, startValue: 1000, endValue: 200 },
+      { startKm: 100, endKm: 200, startValue: 200, endValue: 50 },
+      { startKm: 200, endKm: 400, startValue: 50, endValue: 10 },
+      { startKm: 400, endKm: 1000, startValue: 10, endValue: 0 }
+    ]
+  },
+  {
+    name: "Vancouver Easter Egg",
+    center: EASTER_EGG,
+    bands: [
+      { startKm: 0, endKm: 0.01, startValue: 15000, endValue: 15000 },
+      { startKm: 0.01, endKm: 0.1, startValue: 15000, endValue: 500 },
+      { startKm: 0.1, endKm: 1, startValue: 500, endValue: 20 },
+      { startKm: 1, endKm: 5, startValue: 20, endValue: 0 }
+    ]
+  },
+  {
+    name: "Charlotte, MI",
+    center: CHARLOTTE_MI,
+    bands: [
+      { startKm: 0, endKm: 2, startValue: 575, endValue: 575 },
+      { startKm: 2, endKm: 10, startValue: 575, endValue: 200 },
+      { startKm: 10, endKm: 40, startValue: 200, endValue: 30 },
+      { startKm: 40, endKm: 120, startValue: 30, endValue: 0 }
+    ]
+  },
+  {
+    name: "Pacific Field",
+    center: PACIFIC_FIELD,
+    bands: [
+      { startKm: 0, endKm: 200, startValue: 230, endValue: 230 },
+      { startKm: 200, endKm: 350, startValue: 230, endValue: 20 },
+      { startKm: 350, endKm: 450, startValue: 20, endValue: 0 }
+    ]
+  },
+  {
+    name: "Caribbean Field",
+    center: CARIBBEAN_FIELD,
+    bands: [
+      { startKm: 0, endKm: 1, startValue: 300, endValue: 300 },
+      { startKm: 1, endKm: 10, startValue: 300, endValue: 100 },
+      { startKm: 10, endKm: 25, startValue: 100, endValue: 20 },
+      { startKm: 25, endKm: 40, startValue: 20, endValue: 0 }
+    ]
+  }
+];
 
 const EARTH_RADIUS_KM = 6371;
 
@@ -43,20 +110,14 @@ function lerp(start: number, end: number, t: number) {
   return start + (end - start) * t;
 }
 
-function cltMagneticField(distance: number) {
-  if (distance <= 10) return 1000;
-  if (distance <= 100) return lerp(1000, 200, (distance - 10) / 90);
-  if (distance <= 200) return lerp(200, 50, (distance - 100) / 100);
-  if (distance <= 400) return lerp(50, 10, (distance - 200) / 200);
-  if (distance <= 1000) return lerp(10, 0, (distance - 400) / 600);
-  return 0;
-}
-
-function easterEggField(distanceMeters: number) {
-  if (distanceMeters <= 10) return 15000;
-  if (distanceMeters <= 100) return lerp(15000, 500, (distanceMeters - 10) / 90);
-  if (distanceMeters <= 1000) return lerp(500, 20, (distanceMeters - 100) / 900);
-  if (distanceMeters <= 5000) return lerp(20, 0, (distanceMeters - 1000) / 4000);
+function magneticValueFromBands(distance: number, bands: MagneticSource["bands"]) {
+  for (const band of bands) {
+    if (distance <= band.endKm) {
+      if (band.endKm === band.startKm) return band.endValue;
+      const t = Math.min(Math.max((distance - band.startKm) / (band.endKm - band.startKm), 0), 1);
+      return lerp(band.startValue, band.endValue, t);
+    }
+  }
   return 0;
 }
 
@@ -133,15 +194,16 @@ export default function Home() {
     return { distance, bearing };
   }, [activePosition]);
 
-  const fieldStrength = useMemo(() => {
-    if (!activePosition) return 0;
+  const magneticBreakdown = useMemo(() => {
+    if (!activePosition) return [] as Array<{ name: string; value: number }>;
 
-    const eggDistanceMeters = distanceKm(activePosition, EASTER_EGG) * 1000;
-    const eggValue = easterEggField(eggDistanceMeters);
-    if (eggValue > 0) return eggValue;
-
-    return cltMagneticField(distanceKm(activePosition, CHARLOTTE));
+    return MAGNETIC_SOURCES.map((source) => {
+      const dist = distanceKm(activePosition, source.center);
+      return { name: source.name, value: magneticValueFromBands(dist, source.bands) };
+    });
   }, [activePosition]);
+
+  const fieldStrength = useMemo(() => magneticBreakdown.reduce((sum, item) => sum + item.value, 0), [magneticBreakdown]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -291,8 +353,13 @@ export default function Home() {
             <strong>Distance:</strong> {toCharlotte.distance.toFixed(2)} km
           </p>
           <p>
-            <strong>CLT Magnetic Field:</strong> {formatField(fieldStrength)}
+            <strong>Total Magnetic Field (sum):</strong> {formatField(fieldStrength)}
           </p>
+          {magneticBreakdown.map((item) => (
+            <p key={item.name}>
+              <strong>{item.name}:</strong> {formatField(item.value)}
+            </p>
+          ))}
           {simulatedPosition && <p className="badge">Simulator active (compass disabled)</p>}
           {spoofActive && <p className="badge">Secret teleport spoof active</p>}
         </section>
@@ -303,10 +370,19 @@ export default function Home() {
           <h2>Location Simulator</h2>
           <div className="preset-row">
             <button type="button" onClick={() => setSimulatorPoint(CHARLOTTE)}>
-              Use Charlotte
+              Use Charlotte, NC
+            </button>
+            <button type="button" onClick={() => setSimulatorPoint(CHARLOTTE_MI)}>
+              Use Charlotte, MI Field
             </button>
             <button type="button" onClick={() => setSimulatorPoint(EASTER_EGG)}>
               Use Vancouver Easter Egg
+            </button>
+            <button type="button" onClick={() => setSimulatorPoint(PACIFIC_FIELD)}>
+              Use Pacific Field
+            </button>
+            <button type="button" onClick={() => setSimulatorPoint(CARIBBEAN_FIELD)}>
+              Use Caribbean Field
             </button>
           </div>
           <label>
