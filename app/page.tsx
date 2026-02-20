@@ -139,6 +139,68 @@ function formatField(value: number) {
   return value.toFixed(3);
 }
 
+type Rgb = { r: number; g: number; b: number };
+
+const BACKGROUND_STOPS: Array<{ value: number; color: string }> = [
+  { value: 0, color: "#000000" },
+  { value: 30, color: "#3f0000" },
+  { value: 140, color: "#b91c1c" },
+  { value: 300, color: "#f97316" },
+  { value: 1000, color: "#facc15" },
+  { value: 15000, color: "#2563eb" }
+];
+
+function hexToRgb(hex: string): Rgb {
+  const normalized = hex.replace("#", "");
+  return {
+    r: Number.parseInt(normalized.slice(0, 2), 16),
+    g: Number.parseInt(normalized.slice(2, 4), 16),
+    b: Number.parseInt(normalized.slice(4, 6), 16)
+  };
+}
+
+function mixRgb(start: Rgb, end: Rgb, t: number): Rgb {
+  return {
+    r: Math.round(lerp(start.r, end.r, t)),
+    g: Math.round(lerp(start.g, end.g, t)),
+    b: Math.round(lerp(start.b, end.b, t))
+  };
+}
+
+function rgbToCss(rgb: Rgb, alpha = 1) {
+  return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`;
+}
+
+function fieldMessage(value: number) {
+  if (value <= 0) return "You're not near any Charlotte.";
+  if (value < 100) return "You feel a slight force of Charlotte...";
+  if (value < 199) return "The force is getting stronger...";
+  if (value < 500) return "You enter the sphere of influence.";
+  if (value < 1000) return "CHARLOTTE!!!! YAY!!!!!";
+  if (value < 3000) return "Why is there a stronger Charlotte nearby...?";
+  if (value < 14000) return "The Force is IMMENSE...!";
+  return "YOU FEEL A STRONG CHARLOTTE LOCATION!!!!!!!!!";
+}
+
+function backgroundFromField(value: number) {
+  const clampedValue = Math.max(value, 0);
+
+  if (clampedValue <= BACKGROUND_STOPS[0].value) {
+    const base = hexToRgb(BACKGROUND_STOPS[0].color);
+    return `radial-gradient(circle at 20% 20%, ${rgbToCss(base, 0.5)} 0%, ${rgbToCss(base)} 75%)`;
+  }
+
+  const upperStop = BACKGROUND_STOPS.find((stop) => clampedValue <= stop.value) ?? BACKGROUND_STOPS[BACKGROUND_STOPS.length - 1];
+  const upperIndex = BACKGROUND_STOPS.indexOf(upperStop);
+  const lowerStop = BACKGROUND_STOPS[Math.max(upperIndex - 1, 0)];
+  const span = Math.max(upperStop.value - lowerStop.value, 1);
+  const t = Math.min(Math.max((clampedValue - lowerStop.value) / span, 0), 1);
+
+  const mixed = mixRgb(hexToRgb(lowerStop.color), hexToRgb(upperStop.color), t);
+  const glow = mixRgb(mixed, { r: 255, g: 255, b: 255 }, 0.2);
+  return `radial-gradient(circle at 20% 20%, ${rgbToCss(glow, 0.55)} 0%, ${rgbToCss(mixed, 0.95)} 70%)`;
+}
+
 export default function Home() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -157,6 +219,7 @@ export default function Home() {
   const [simLonInput, setSimLonInput] = useState("");
   const [simulatedPosition, setSimulatedPosition] = useState<Coordinates | null>(null);
   const [activeTargetIndex, setActiveTargetIndex] = useState(0);
+  const [animationMs, setAnimationMs] = useState(0);
 
   const compassDisabled = simulatedPosition !== null;
   const activePosition = simulatedPosition ?? position;
@@ -219,6 +282,21 @@ export default function Home() {
   }, [activePosition]);
 
   const fieldStrength = useMemo(() => magneticBreakdown.reduce((sum, item) => sum + item.value, 0), [magneticBreakdown]);
+  const statusMessage = useMemo(() => fieldMessage(fieldStrength), [fieldStrength]);
+  const dynamicBackground = useMemo(() => backgroundFromField(fieldStrength), [fieldStrength]);
+
+  useEffect(() => {
+    let frameId = 0;
+
+    const animate = (time: number) => {
+      setAnimationMs(time);
+      frameId = window.requestAnimationFrame(animate);
+    };
+
+    frameId = window.requestAnimationFrame(animate);
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -265,6 +343,19 @@ export default function Home() {
     const tipX = center + Math.cos(targetAngle) * (radius - 10);
     const tipY = center + Math.sin(targetAngle) * (radius - 10);
 
+    const pulsesPerSecond = Math.min(fieldStrength / 1000, 8);
+    if (pulsesPerSecond > 0) {
+      const phase = (animationMs / 1000) * pulsesPerSecond;
+      const wave = (Math.sin(phase * Math.PI * 2) + 1) / 2;
+      const pulseRadius = 8 + wave * 28;
+
+      ctx.strokeStyle = `rgba(251, 113, 133, ${0.1 + wave * 0.45})`;
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.arc(tipX, tipY, pulseRadius, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
     ctx.strokeStyle = "#fb7185";
     ctx.lineWidth = 5;
     ctx.beginPath();
@@ -280,7 +371,7 @@ export default function Home() {
     ctx.fillStyle = "#bfdbfe";
     ctx.font = "500 14px Inter, sans-serif";
     ctx.fillText(activeTarget.label, center - 70, center + radius + 25);
-  }, [activeTarget.label, compassDisabled, heading, toTarget]);
+  }, [activeTarget.label, animationMs, compassDisabled, fieldStrength, heading, toTarget]);
 
   const submitTeleport = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -332,7 +423,7 @@ export default function Home() {
   };
 
   return (
-    <main className="page">
+    <main className="page" style={{ background: dynamicBackground }}>
       <h1
         onClick={() => {
           const next = titleTapCount + 1;
@@ -382,6 +473,9 @@ export default function Home() {
           </p>
           <p>
             <strong>CLT Magnetic FIeld™:</strong> {formatField(fieldStrength)}
+          </p>
+          <p>
+            <strong>Status:</strong> {statusMessage}
           </p>
           {simulatedPosition && <p className="badge">Simulator active (compass disabled)</p>}
           {spoofActive && <p className="badge">Secret teleport spoof active</p>}
