@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 
 type Coordinates = {
   lat: number;
@@ -18,23 +18,11 @@ type MagneticSource = {
   }>;
 };
 
-type CompassTarget = {
-  label: string;
-  center: Coordinates;
-};
-
 const CHARLOTTE: Coordinates = { lat: 35.22867647481079, lon: -80.84490976473366 };
-const EASTER_EGG: Coordinates = { lat: 49.2729341959022, lon: -123.06941193669999 }; // Secret Vancouver anomaly
+const EASTER_EGG: Coordinates = { lat: 49.2729341959022, lon: -123.06941193669999 };
 const CHARLOTTE_MI: Coordinates = { lat: 42.56318196348821, lon: -84.83584647437215 };
 const PACIFIC_FIELD: Coordinates = { lat: 53.255510249854304, lon: -132.08947116604432 };
 const CARIBBEAN_FIELD: Coordinates = { lat: 18.34185490966226, lon: -64.9316281681369 };
-
-const COMPASS_TARGETS: CompassTarget[] = [
-  { label: "Charlotte, NC", center: CHARLOTTE },
-  { label: "Charlotte, MI", center: CHARLOTTE_MI },
-  { label: "Haida Gwaii Islands", center: PACIFIC_FIELD },
-  { label: "Charlotte Amalie, US Virgin Islands", center: CARIBBEAN_FIELD }
-];
 
 const MAGNETIC_SOURCES: MagneticSource[] = [
   {
@@ -92,19 +80,6 @@ const MAGNETIC_SOURCES: MagneticSource[] = [
 const EARTH_RADIUS_KM = 6371;
 
 const toRad = (deg: number) => (deg * Math.PI) / 180;
-const toDeg = (rad: number) => (rad * 180) / Math.PI;
-
-function normalizeHeading(deg: number) {
-  return ((deg % 360) + 360) % 360;
-}
-
-function getScreenAngle() {
-  const orientationApi = window.screen.orientation;
-  if (typeof orientationApi?.angle === "number") return orientationApi.angle;
-
-  const legacyOrientation = (window as Window & { orientation?: number }).orientation;
-  return typeof legacyOrientation === "number" ? legacyOrientation : 0;
-}
 
 function distanceKm(a: Coordinates, b: Coordinates) {
   const dLat = toRad(b.lat - a.lat);
@@ -117,17 +92,6 @@ function distanceKm(a: Coordinates, b: Coordinates) {
     Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
 
   return 2 * EARTH_RADIUS_KM * Math.atan2(Math.sqrt(hav), Math.sqrt(1 - hav));
-}
-
-function bearingDeg(from: Coordinates, to: Coordinates) {
-  const lat1 = toRad(from.lat);
-  const lat2 = toRad(to.lat);
-  const dLon = toRad(to.lon - from.lon);
-
-  const y = Math.sin(dLon) * Math.cos(lat2);
-  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
-
-  return (toDeg(Math.atan2(y, x)) + 360) % 360;
 }
 
 function lerp(start: number, end: number, t: number) {
@@ -214,14 +178,8 @@ function backgroundFromField(value: number) {
 }
 
 export default function Home() {
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-
   const [position, setPosition] = useState<Coordinates | null>(null);
-  const [heading, setHeading] = useState<number>(0);
-  const [headingAccuracy, setHeadingAccuracy] = useState<"true-north" | "approximate" | "magnetometer" | "unknown">("unknown");
-  const [orientationPermissionRequired, setOrientationPermissionRequired] = useState(false);
-  const [orientationEnabled, setOrientationEnabled] = useState(false);
-  const [error, setError] = useState<string>("");
+  const [error, setError] = useState("");
 
   const [teleportVisible, setTeleportVisible] = useState(false);
   const [latInput, setLatInput] = useState("");
@@ -233,14 +191,8 @@ export default function Home() {
   const [simLatInput, setSimLatInput] = useState("");
   const [simLonInput, setSimLonInput] = useState("");
   const [simulatedPosition, setSimulatedPosition] = useState<Coordinates | null>(null);
-  const [activeTargetIndex, setActiveTargetIndex] = useState(0);
 
   const activePosition = simulatedPosition ?? position;
-  const [headingOffset, setHeadingOffset] = useState(0);
-  const [cameraError, setCameraError] = useState("");
-  const [cameraActive, setCameraActive] = useState(false);
-  const [magnetometerAvailable, setMagnetometerAvailable] = useState(false);
-  const [magnetometerEnabled, setMagnetometerEnabled] = useState(false);
 
   useEffect(() => {
     if (!navigator.geolocation) {
@@ -261,220 +213,24 @@ export default function Home() {
       { enableHighAccuracy: true }
     );
 
-    const permissionApi = DeviceOrientationEvent as typeof DeviceOrientationEvent & {
-      requestPermission?: () => Promise<"granted" | "denied">;
-    };
-
-    if (typeof permissionApi.requestPermission === "function") {
-      setOrientationPermissionRequired(true);
-      setOrientationEnabled(false);
-    } else {
-      setOrientationEnabled(true);
-    }
-
     return () => {
       navigator.geolocation.clearWatch(watchId);
     };
   }, [spoofActive]);
 
-  useEffect(() => {
-    if (!orientationEnabled) return;
-
-    const onOrientation = (event: DeviceOrientationEvent) => {
-      if (magnetometerEnabled) return;
-      const webkitHeading = (event as DeviceOrientationEvent & { webkitCompassHeading?: number }).webkitCompassHeading;
-      if (typeof webkitHeading === "number" && Number.isFinite(webkitHeading)) {
-        setHeading(normalizeHeading(webkitHeading));
-        setHeadingAccuracy("true-north");
-        return;
-      }
-
-      if (event.alpha === null) return;
-
-      const alpha = normalizeHeading(event.alpha);
-      const screenAngle = getScreenAngle();
-      const computedHeading = normalizeHeading(360 - alpha + screenAngle);
-      setHeading(computedHeading);
-      setHeadingAccuracy(event.absolute ? "approximate" : "unknown");
-    };
-
-    const eventName = "ondeviceorientationabsolute" in window ? "deviceorientationabsolute" : "deviceorientation";
-    window.addEventListener(eventName, onOrientation as EventListener);
-
-    return () => {
-      window.removeEventListener(eventName, onOrientation as EventListener);
-    };
-  }, [magnetometerEnabled, orientationEnabled]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const userAgent = navigator.userAgent.toLowerCase();
-    const isSamsung = userAgent.includes("samsung") || userAgent.includes("sm-");
-    const MagnetometerCtor = (window as Window & { Magnetometer?: new (options?: { frequency?: number }) => {
-      x: number | null;
-      y: number | null;
-      addEventListener: (type: "reading" | "error", listener: EventListener) => void;
-      removeEventListener: (type: "reading" | "error", listener: EventListener) => void;
-      start: () => void;
-      stop: () => void;
-    } }).Magnetometer;
-
-    if (!isSamsung || !MagnetometerCtor) {
-      setMagnetometerAvailable(false);
-      return;
-    }
-
-    setMagnetometerAvailable(true);
-    let sensor: InstanceType<typeof MagnetometerCtor> | null = null;
-
-    const startSensor = async () => {
-      try {
-        const permissionsApi = navigator.permissions as Permissions | undefined;
-        if (permissionsApi?.query) {
-          const status = await permissionsApi.query({ name: "magnetometer" as PermissionName });
-          if (status.state === "denied") return;
-        }
-      } catch {
-        // Ignore permissions API issues and try sensor start directly.
-      }
-
-      try {
-        sensor = new MagnetometerCtor({ frequency: 20 });
-      } catch {
-        return;
-      }
-
-      const onReading = () => {
-        if (!sensor || sensor.x === null || sensor.y === null) return;
-
-        const rawHeading = toDeg(Math.atan2(sensor.y, sensor.x));
-        const screenAngle = getScreenAngle();
-        const headingFromMag = normalizeHeading(rawHeading + 90 + screenAngle);
-        setHeading(headingFromMag);
-        setHeadingAccuracy("magnetometer");
-        setMagnetometerEnabled(true);
-      };
-
-      const onError = () => {
-        setMagnetometerEnabled(false);
-      };
-
-      sensor.addEventListener("reading", onReading as EventListener);
-      sensor.addEventListener("error", onError as EventListener);
-      sensor.start();
-    };
-
-    startSensor();
-
-    return () => {
-      if (sensor) {
-        sensor.stop();
-      }
-      setMagnetometerEnabled(false);
-    };
-  }, []);
-
-  const enableOrientation = async () => {
-    const permissionApi = DeviceOrientationEvent as typeof DeviceOrientationEvent & {
-      requestPermission?: () => Promise<"granted" | "denied">;
-    };
-
-    if (typeof permissionApi.requestPermission !== "function") {
-      setOrientationEnabled(true);
-      return;
-    }
-
-    try {
-      const permission = await permissionApi.requestPermission();
-      if (permission === "granted") {
-        setOrientationEnabled(true);
-        setOrientationPermissionRequired(false);
-      } else {
-        setError("Compass permission denied. Enable motion access in Safari settings.");
-      }
-    } catch {
-      setError("Could not request compass permission on this device.");
-    }
-  };
-
-
-  useEffect(() => {
-    if (!navigator.mediaDevices?.getUserMedia) {
-      setCameraError("Back camera is not available in this browser.");
-      return;
-    }
-
-    let mounted = true;
-    let stream: MediaStream | null = null;
-
-    const startCamera = async () => {
-      try {
-        const preferred = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: "environment" } },
-          audio: false
-        });
-        stream = preferred;
-      } catch {
-        try {
-          stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-        } catch {
-          if (mounted) {
-            setCameraError("Unable to access camera. Allow camera permission to use AR arrow mode.");
-            setCameraActive(false);
-          }
-          return;
-        }
-      }
-
-      if (!mounted || !stream) return;
-      const video = videoRef.current;
-      if (video) {
-        video.srcObject = stream;
-        await video.play().catch(() => undefined);
-      }
-      setCameraError("");
-      setCameraActive(true);
-    };
-
-    startCamera();
-
-    return () => {
-      mounted = false;
-      if (stream) {
-        for (const track of stream.getTracks()) track.stop();
-      }
-    };
-  }, []);
-
-  const activeTarget = COMPASS_TARGETS[activeTargetIndex] ?? COMPASS_TARGETS[0];
-
-  const toTarget = useMemo(() => {
-    if (!activePosition) return null;
-    const distance = distanceKm(activePosition, activeTarget.center);
-    const bearing = bearingDeg(activePosition, activeTarget.center);
-    return { distance, bearing };
-  }, [activePosition, activeTarget]);
-
   const magneticBreakdown = useMemo(() => {
-    if (!activePosition) return [] as Array<{ name: string; value: number }>;
+    if (!activePosition) return [] as Array<{ name: string; value: number; distance: number }>;
 
     return MAGNETIC_SOURCES.map((source) => {
       const dist = distanceKm(activePosition, source.center);
-      return { name: source.name, value: magneticValueFromBands(dist, source.bands) };
-    });
+      return { name: source.name, value: magneticValueFromBands(dist, source.bands), distance: dist };
+    }).sort((a, b) => b.value - a.value);
   }, [activePosition]);
 
   const fieldStrength = useMemo(() => magneticBreakdown.reduce((sum, item) => sum + item.value, 0), [magneticBreakdown]);
   const statusMessage = useMemo(() => fieldMessage(fieldStrength), [fieldStrength]);
   const dynamicBackground = useMemo(() => backgroundFromField(fieldStrength), [fieldStrength]);
-  const calibratedHeading = useMemo(() => normalizeHeading(heading + headingOffset), [heading, headingOffset]);
-  const relativeBearing = useMemo(() => {
-    if (!toTarget) return 0;
-    return normalizeHeading(toTarget.bearing - calibratedHeading);
-  }, [calibratedHeading, toTarget]);
   const pulsesPerSecond = useMemo(() => Math.min(fieldStrength / 1000, 8), [fieldStrength]);
-
 
   const submitTeleport = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -537,97 +293,44 @@ export default function Home() {
           }
         }}
       >
-        Charlotte Finder Compass
+        CLT Magnetic Field Tracker
       </h1>
-      <p className="subtitle">Qibla-style direction finder for Charlotte, North Carolina.</p>
+      <p className="subtitle">No compass. No camera. Just raw Charlotte magnetic vibes.</p>
 
       <button className="sim-toggle" type="button" onClick={() => setSimulatorOpen((prev) => !prev)}>
         {simulatorOpen ? "Hide" : "Open"} Location Simulator
       </button>
 
-      {orientationPermissionRequired && !orientationEnabled && (
-        <button className="sim-toggle" type="button" onClick={enableOrientation}>
-          Enable iOS Compass Access
-        </button>
-      )}
-
-      {!orientationEnabled && !orientationPermissionRequired && <p className="subtitle">Compass sensor unavailable.</p>}
-
-      <section className="camera-shell">
-        <video ref={videoRef} className="camera-feed" autoPlay muted playsInline />
-        <div className="camera-overlay">
-          <div
-            className="ar-horizon-line"
-            style={{
-              transform: `translate(-50%, -50%) rotate(${relativeBearing}deg)`,
-              animationDuration: pulsesPerSecond > 0 ? `${Math.max(1 / pulsesPerSecond, 0.12)}s` : undefined
-            }}
-          />
-          <p className="ar-label">Rotate until the horizon line points toward Charlotte</p>
-        </div>
+      <section className="field-core">
+        <div
+          className="field-pulse"
+          style={{ animationDuration: pulsesPerSecond > 0 ? `${Math.max(1 / pulsesPerSecond, 0.12)}s` : undefined }}
+        />
+        <p className="field-value">{formatField(fieldStrength)}</p>
+        <p className="field-label">CLT Magnetic Field™</p>
+        <p className="field-status">{statusMessage}</p>
       </section>
 
-      {cameraError && <p className="error">{cameraError}</p>}
-      {!cameraActive && !cameraError && <p className="subtitle">Starting back camera...</p>}
-
-
-      <section className="target-selector">
-        {COMPASS_TARGETS.map((target, index) => (
-          <button
-            key={target.label}
-            type="button"
-            className={index === activeTargetIndex ? "target-active" : ""}
-            onClick={() => setActiveTargetIndex(index)}
-          >
-            {target.label}
-          </button>
-        ))}
-      </section>
-
-      {toTarget && (
-        <section className="target-selector">
-          <button
-            type="button"
-            onClick={() => {
-              setHeadingOffset(normalizeHeading(toTarget.bearing - heading));
-            }}
-          >
-            Calibrate to current target direction
-          </button>
-          <button type="button" onClick={() => setHeadingOffset(0)}>
-            Reset calibration
-          </button>
-        </section>
-      )}
-
-      {toTarget && (
+      {activePosition && (
         <section className="stats">
           <p>
-            <strong>Compass target:</strong> {activeTarget.label}
-          </p>
-          <p>
-            <strong>Active point:</strong> {activePosition?.lat.toFixed(12)}, {activePosition?.lon.toFixed(12)}
-          </p>
-          <p>
-            <strong>Bearing:</strong> {toTarget.bearing.toFixed(2)}°
-          </p>
-          <p>
-            <strong>Heading quality:</strong> {headingAccuracy} ({calibratedHeading.toFixed(1)}°)
-          </p>
-          <p>
-            <strong>Samsung magnetometer:</strong> {magnetometerAvailable ? (magnetometerEnabled ? "active" : "available") : "not available"}
-          </p>
-          <p>
-            <strong>Distance:</strong> {toTarget.distance.toFixed(2)} km
-          </p>
-          <p>
-            <strong>CLT Magnetic FIeld™:</strong> {formatField(fieldStrength)}
-          </p>
-          <p>
-            <strong>Status:</strong> {statusMessage}
+            <strong>Active point:</strong> {activePosition.lat.toFixed(12)}, {activePosition.lon.toFixed(12)}
           </p>
           {simulatedPosition && <p className="badge">Simulator active (using simulated location)</p>}
           {spoofActive && <p className="badge">Secret teleport spoof active</p>}
+        </section>
+      )}
+
+      {magneticBreakdown.length > 0 && (
+        <section className="stats">
+          <p>
+            <strong>Field contributors</strong>
+          </p>
+          {magneticBreakdown.map((entry) => (
+            <p key={entry.name}>
+              {entry.name}: {formatField(entry.value)} ({entry.distance.toFixed(1)} km)
+            </p>
+          ))}
         </section>
       )}
 
