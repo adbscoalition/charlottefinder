@@ -9,7 +9,7 @@
 body {
   margin: 0;
   min-height: 100vh;
-  font-family: Inter, Arial, sans-serif;
+  font-family: var(--font-public-sans), Arial, sans-serif;
   background: radial-gradient(circle at 20% 20%, #111827 0%, #020617 70%);
   color: #e2e8f0;
 }
@@ -27,12 +27,18 @@ body {
 h1 {
   margin: 0;
   cursor: pointer;
+  font-family: var(--font-bitcount-grid-double), sans-serif;
+}
+
+h2 {
+  font-family: var(--font-russo-one), sans-serif;
 }
 
 .subtitle {
   margin-top: 0.4rem;
   margin-bottom: 1.2rem;
   color: #cbd5e1;
+  font-family: var(--font-russo-one), sans-serif;
 }
 
 .sim-toggle {
@@ -79,6 +85,7 @@ h1 {
   font-size: clamp(2rem, 8vw, 3.2rem);
   font-weight: 800;
   margin: 0;
+  font-family: var(--font-fira-code), monospace;
 }
 
 .field-label {
@@ -169,4 +176,9 @@ button {
 .error {
   margin-top: 1rem;
   color: #fda4af;
+}
+
+
+.stat-number {
+  font-family: var(--font-fira-code), monospace;
 }

@@ -362,10 +362,10 @@ export default function Home() {
             <strong>Tracked location:</strong> {activeTarget.label}
           </p>
           <p>
-            <strong>Distance:</strong> {toTarget.distance.toFixed(2)} km
+            <strong>Distance:</strong> <span className="stat-number">{toTarget.distance.toFixed(2)}</span> km
           </p>
           <p>
-            <strong>Heading:</strong> {toTarget.bearing.toFixed(2)}°
+            <strong>Heading:</strong> <span className="stat-number">{toTarget.bearing.toFixed(2)}°</span>
           </p>
           {simulatedPosition && <p className="badge">Simulator active (using simulated location)</p>}
           {spoofActive && <p className="badge">Secret teleport spoof active</p>}
