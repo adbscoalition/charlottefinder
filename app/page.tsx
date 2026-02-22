@@ -515,15 +515,14 @@ export default function Home() {
     setError("");
   };
 
-  const unlockLocationChanger = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const unlockCharlotteSelector = () => {
     if (locationPasswordInput === LOCATION_PASSWORD) {
       setLocationChangerUnlocked(true);
       setLocationPasswordInput("");
       setError("");
       return;
     }
-    setError("Incorrect location changer password.");
+    setError("Incorrect Charlotte Selector password.");
   };
 
   return (
@@ -604,22 +603,9 @@ export default function Home() {
 
       <details className="target-list" open>
         <summary>
-          Selected location: <span className="badge">{activeTarget.label}</span>
+          Charlotte Selector: <span className="badge">{activeTarget.label}</span>
         </summary>
-        {!locationChangerUnlocked ? (
-          <form className="password-lock" onSubmit={unlockLocationChanger}>
-            <label>
-              Location changer password
-              <input
-                type="password"
-                value={locationPasswordInput}
-                onChange={(event) => setLocationPasswordInput(event.target.value)}
-                placeholder="Enter password"
-              />
-            </label>
-            <button type="submit">Unlock Location Changer</button>
-          </form>
-        ) : (
+        {locationChangerUnlocked ? (
           <section className="target-selector">
             {COMPASS_TARGETS.map((target, index) => (
               <button
@@ -632,6 +618,8 @@ export default function Home() {
               </button>
             ))}
           </section>
+        ) : (
+          <p className="badge">Charlotte Selector is locked. Use Location Simulator to unlock.</p>
         )}
       </details>
 
@@ -648,16 +636,6 @@ export default function Home() {
           </p>
           {simulatedPosition && <p className="badge">Simulator active (using simulated location)</p>}
           {spoofActive && <p className="badge">Secret teleport spoof active</p>}
-          {isPstMicroSecretToggleWindow() && (
-            <label className="offtime-toggle">
-              <input
-                type="checkbox"
-                checked={microSecretOfftimeEnabled}
-                onChange={(event) => setMicroSecretOfftimeEnabled(event.target.checked)}
-              />
-              Enable off-time micro secret field override (7:00pm-10:00am PST)
-            </label>
-          )}
         </section>
       )}
 
@@ -668,6 +646,34 @@ export default function Home() {
       {simulatorOpen && (
         <form onSubmit={submitSimulator} className="teleport">
           <h2>Location Simulator</h2>
+          {!locationChangerUnlocked ? (
+            <section className="password-lock">
+              <label>
+                Charlotte Selector password
+                <input
+                  type="password"
+                  value={locationPasswordInput}
+                  onChange={(event) => setLocationPasswordInput(event.target.value)}
+                  placeholder="Enter password"
+                />
+              </label>
+              <button type="button" onClick={unlockCharlotteSelector}>
+                Unlock Charlotte Selector
+              </button>
+            </section>
+          ) : (
+            <p className="badge">Charlotte Selector unlocked</p>
+          )}
+          {isPstMicroSecretToggleWindow() && (
+            <label className="offtime-toggle">
+              <input
+                type="checkbox"
+                checked={microSecretOfftimeEnabled}
+                onChange={(event) => setMicroSecretOfftimeEnabled(event.target.checked)}
+              />
+              Enable off-time micro secret field override (7:00pm-10:00am PST)
+            </label>
+          )}
           <div className="preset-row">
             <button type="button" onClick={() => setSimulatorPoint(CHARLOTTE)}>
               Use Charlotte, NC
