@@ -47,6 +47,12 @@ body {
   animation: rainbow-text-shift 14s linear infinite;
 }
 
+
+.page-rainbow-mode .field-value {
+  animation: field-jitter 0.06s ease-in-out infinite, hue-chaos 0.8s linear infinite;
+}
+
+
 .space-particles {
   position: absolute;
   inset: 0;
