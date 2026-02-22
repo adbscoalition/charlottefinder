@@ -326,7 +326,7 @@ export default function Home() {
     }
 
     setMagnetometerAvailable(true);
-    let sensor: ReturnType<typeof MagnetometerCtor> | null = null;
+    let sensor: InstanceType<typeof MagnetometerCtor> | null = null;
 
     const startSensor = async () => {
       try {
