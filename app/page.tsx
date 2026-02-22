@@ -367,8 +367,8 @@ export default function Home() {
   const [simLonInput, setSimLonInput] = useState("");
   const [simulatedPosition, setSimulatedPosition] = useState<Coordinates | null>(null);
   const [activeTargetIndex, setActiveTargetIndex] = useState(0);
-  const [locationPasswordInput, setLocationPasswordInput] = useState("");
-  const [locationChangerUnlocked, setLocationChangerUnlocked] = useState(false);
+  const [simulatorPasswordInput, setSimulatorPasswordInput] = useState("");
+  const [simulatorUnlocked, setSimulatorUnlocked] = useState(false);
   const [microSecretOfftimeEnabled, setMicroSecretOfftimeEnabled] = useState(false);
 
   const activePosition = simulatedPosition ?? position;
@@ -497,6 +497,11 @@ export default function Home() {
   const submitSimulator = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
+    if (!simulatorUnlocked) {
+      setError("Unlock Location Simulator first.");
+      return;
+    }
+
     const lat = Number(simLatInput);
     const lon = Number(simLonInput);
 
@@ -516,14 +521,14 @@ export default function Home() {
     setError("");
   };
 
-  const unlockCharlotteSelector = () => {
-    if (locationPasswordInput === LOCATION_PASSWORD) {
-      setLocationChangerUnlocked(true);
-      setLocationPasswordInput("");
+  const unlockLocationSimulator = () => {
+    if (simulatorPasswordInput === LOCATION_PASSWORD) {
+      setSimulatorUnlocked(true);
+      setSimulatorPasswordInput("");
       setError("");
       return;
     }
-    setError("Incorrect Charlotte Selector password.");
+    setError("Incorrect Location Simulator password.");
   };
 
   return (
@@ -606,8 +611,7 @@ export default function Home() {
         <summary>
           Charlotte Selector: <span className="badge">{activeTarget.label}</span>
         </summary>
-        {locationChangerUnlocked ? (
-          <section className="target-selector">
+        <section className="target-selector">
             {COMPASS_TARGETS.map((target, index) => (
               <button
                 key={target.label}
@@ -619,9 +623,6 @@ export default function Home() {
               </button>
             ))}
           </section>
-        ) : (
-          <p className="badge">Charlotte Selector is locked. Use Location Simulator to unlock.</p>
-        )}
       </details>
 
       {toTarget && (
@@ -647,25 +648,25 @@ export default function Home() {
       {simulatorOpen && (
         <form onSubmit={submitSimulator} className="teleport">
           <h2>Location Simulator</h2>
-          {!locationChangerUnlocked ? (
+                    {!simulatorUnlocked ? (
             <section className="password-lock">
               <label>
-                Charlotte Selector password
+                Location Simulator password
                 <input
                   type="password"
-                  value={locationPasswordInput}
-                  onChange={(event) => setLocationPasswordInput(event.target.value)}
+                  value={simulatorPasswordInput}
+                  onChange={(event) => setSimulatorPasswordInput(event.target.value)}
                   placeholder="Enter password"
                 />
               </label>
-              <button type="button" onClick={unlockCharlotteSelector}>
-                Unlock Charlotte Selector
+              <button type="button" onClick={unlockLocationSimulator}>
+                Unlock Location Simulator
               </button>
             </section>
           ) : (
-            <p className="badge">Charlotte Selector unlocked</p>
+            <p className="badge">Location Simulator unlocked</p>
           )}
-          {isPstMicroSecretToggleWindow() && (
+          {simulatorUnlocked && isPstMicroSecretToggleWindow() && (
             <label className="offtime-toggle">
               <input
                 type="checkbox"
@@ -675,7 +676,7 @@ export default function Home() {
               Enable off-time micro secret field override (7:00pm-10:00am PST)
             </label>
           )}
-          <div className="preset-row">
+          {simulatorUnlocked && <div className="preset-row">
             <button type="button" onClick={() => setSimulatorPoint(CHARLOTTE)}>
               Use Charlotte, NC
             </button>
@@ -694,26 +695,30 @@ export default function Home() {
             <button type="button" onClick={() => setSimulatorPoint(CHARLOTTETOWN_PEI)}>
               Use Charlottetown, PEI
             </button>
-          </div>
-          <label>
+          </div>}
+          {simulatorUnlocked && <label>
             Latitude
             <input value={simLatInput} onChange={(e) => setSimLatInput(e.target.value)} placeholder="35.22867647481079" />
-          </label>
-          <label>
+          </label>}
+          {simulatorUnlocked && <label>
             Longitude
             <input value={simLonInput} onChange={(e) => setSimLonInput(e.target.value)} placeholder="-80.84490976473366" />
-          </label>
-          <button type="submit">Simulate Location</button>
-          <button
-            type="button"
-            onClick={() => {
-              setSimLatInput("");
-              setSimLonInput("");
-              setSimulatedPosition(null);
-            }}
-          >
-            Disable simulator
-          </button>
+          </label>}
+          {simulatorUnlocked && (
+            <>
+              <button type="submit">Simulate Location</button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSimLatInput("");
+                  setSimLonInput("");
+                  setSimulatedPosition(null);
+                }}
+              >
+                Disable simulator
+              </button>
+            </>
+          )}
         </form>
       )}
 
