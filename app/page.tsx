@@ -94,6 +94,18 @@ const EARTH_RADIUS_KM = 6371;
 const toRad = (deg: number) => (deg * Math.PI) / 180;
 const toDeg = (rad: number) => (rad * 180) / Math.PI;
 
+function normalizeHeading(deg: number) {
+  return ((deg % 360) + 360) % 360;
+}
+
+function getScreenAngle() {
+  const orientationApi = window.screen.orientation;
+  if (typeof orientationApi?.angle === "number") return orientationApi.angle;
+
+  const legacyOrientation = (window as Window & { orientation?: number }).orientation;
+  return typeof legacyOrientation === "number" ? legacyOrientation : 0;
+}
+
 function distanceKm(a: Coordinates, b: Coordinates) {
   const dLat = toRad(b.lat - a.lat);
   const dLon = toRad(b.lon - a.lon);
@@ -206,6 +218,9 @@ export default function Home() {
 
   const [position, setPosition] = useState<Coordinates | null>(null);
   const [heading, setHeading] = useState<number>(0);
+  const [headingAccuracy, setHeadingAccuracy] = useState<"true-north" | "approximate" | "unknown">("unknown");
+  const [orientationPermissionRequired, setOrientationPermissionRequired] = useState(false);
+  const [orientationEnabled, setOrientationEnabled] = useState(false);
   const [error, setError] = useState<string>("");
 
   const [teleportVisible, setTeleportVisible] = useState(false);
@@ -243,25 +258,72 @@ export default function Home() {
       { enableHighAccuracy: true }
     );
 
-    const onOrientation = (event: DeviceOrientationEvent) => {
-      const webkitHeading = (event as DeviceOrientationEvent & { webkitCompassHeading?: number }).webkitCompassHeading;
-      if (typeof webkitHeading === "number") {
-        setHeading((360 - webkitHeading) % 360);
-        return;
-      }
-
-      if (event.alpha !== null) {
-        setHeading((360 - event.alpha + 360) % 360);
-      }
+    const permissionApi = DeviceOrientationEvent as typeof DeviceOrientationEvent & {
+      requestPermission?: () => Promise<"granted" | "denied">;
     };
 
-    window.addEventListener("deviceorientation", onOrientation);
+    if (typeof permissionApi.requestPermission === "function") {
+      setOrientationPermissionRequired(true);
+      setOrientationEnabled(false);
+    } else {
+      setOrientationEnabled(true);
+    }
 
     return () => {
       navigator.geolocation.clearWatch(watchId);
-      window.removeEventListener("deviceorientation", onOrientation);
     };
   }, [spoofActive]);
+
+  useEffect(() => {
+    if (!orientationEnabled) return;
+
+    const onOrientation = (event: DeviceOrientationEvent) => {
+      const webkitHeading = (event as DeviceOrientationEvent & { webkitCompassHeading?: number }).webkitCompassHeading;
+      if (typeof webkitHeading === "number" && Number.isFinite(webkitHeading)) {
+        setHeading(normalizeHeading(webkitHeading));
+        setHeadingAccuracy("true-north");
+        return;
+      }
+
+      if (event.alpha === null) return;
+
+      const alpha = normalizeHeading(event.alpha);
+      const screenAngle = getScreenAngle();
+      const computedHeading = normalizeHeading(360 - alpha + screenAngle);
+      setHeading(computedHeading);
+      setHeadingAccuracy(event.absolute ? "approximate" : "unknown");
+    };
+
+    const eventName = "ondeviceorientationabsolute" in window ? "deviceorientationabsolute" : "deviceorientation";
+    window.addEventListener(eventName, onOrientation as EventListener);
+
+    return () => {
+      window.removeEventListener(eventName, onOrientation as EventListener);
+    };
+  }, [orientationEnabled]);
+
+  const enableOrientation = async () => {
+    const permissionApi = DeviceOrientationEvent as typeof DeviceOrientationEvent & {
+      requestPermission?: () => Promise<"granted" | "denied">;
+    };
+
+    if (typeof permissionApi.requestPermission !== "function") {
+      setOrientationEnabled(true);
+      return;
+    }
+
+    try {
+      const permission = await permissionApi.requestPermission();
+      if (permission === "granted") {
+        setOrientationEnabled(true);
+        setOrientationPermissionRequired(false);
+      } else {
+        setError("Compass permission denied. Enable motion access in Safari settings.");
+      }
+    } catch {
+      setError("Could not request compass permission on this device.");
+    }
+  };
 
   const activeTarget = COMPASS_TARGETS[activeTargetIndex] ?? COMPASS_TARGETS[0];
 
@@ -442,6 +504,14 @@ export default function Home() {
         {simulatorOpen ? "Hide" : "Open"} Location Simulator
       </button>
 
+      {orientationPermissionRequired && !orientationEnabled && (
+        <button className="sim-toggle" type="button" onClick={enableOrientation}>
+          Enable iOS Compass Access
+        </button>
+      )}
+
+      {!orientationEnabled && !orientationPermissionRequired && <p className="subtitle">Compass sensor unavailable.</p>}
+
       <canvas ref={canvasRef} className="compass" />
 
       <section className="target-selector">
@@ -467,6 +537,9 @@ export default function Home() {
           </p>
           <p>
             <strong>Bearing:</strong> {toTarget.bearing.toFixed(2)}°
+          </p>
+          <p>
+            <strong>Heading quality:</strong> {headingAccuracy}
           </p>
           <p>
             <strong>Distance:</strong> {toTarget.distance.toFixed(2)} km
