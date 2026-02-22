@@ -203,6 +203,18 @@ const PULSE_RING_STOPS: Array<{ value: number; color: string }> = [
   { value: 15000, color: "#2563eb" }
 ];
 
+
+const BACKDROP_PARTICLES = [
+  { symbol: "✦", top: "8%", left: "12%", delay: "0s" },
+  { symbol: "♥", top: "16%", left: "78%", delay: "0.9s" },
+  { symbol: "★", top: "30%", left: "24%", delay: "0.4s" },
+  { symbol: "✦", top: "38%", left: "88%", delay: "1.3s" },
+  { symbol: "♥", top: "56%", left: "10%", delay: "0.7s" },
+  { symbol: "★", top: "70%", left: "72%", delay: "1.6s" },
+  { symbol: "✦", top: "82%", left: "36%", delay: "0.2s" },
+  { symbol: "♥", top: "88%", left: "92%", delay: "1.1s" }
+];
+
 function hexToRgb(hex: string): Rgb {
   const normalized = hex.replace("#", "");
   return {
@@ -280,6 +292,7 @@ export default function Home() {
   const [position, setPosition] = useState<Coordinates | null>(null);
   const [error, setError] = useState("");
   const [hasInitialFix, setHasInitialFix] = useState(false);
+  const [refreshTick, setRefreshTick] = useState(0);
 
   const [teleportVisible, setTeleportVisible] = useState(false);
   const [latInput, setLatInput] = useState("");
@@ -320,6 +333,16 @@ export default function Home() {
     };
   }, [spoofActive]);
 
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setRefreshTick((prev) => prev + 1);
+    }, 1200);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, []);
+
   const activeTarget = COMPASS_TARGETS[activeTargetIndex] ?? COMPASS_TARGETS[0];
 
   const toTarget = useMemo(() => {
@@ -341,19 +364,32 @@ export default function Home() {
   const fieldStrength = useMemo(() => magneticBreakdown.reduce((sum, item) => sum + item.value, 0), [magneticBreakdown]);
   const regularFieldStrength = useMemo(() => magneticBreakdown.filter((item) => item.category === "regular").reduce((sum, item) => sum + item.value, 0), [magneticBreakdown]);
   const secretFieldStrength = useMemo(() => magneticBreakdown.filter((item) => item.category === "secret").reduce((sum, item) => sum + item.value, 0), [magneticBreakdown]);
-  const statusMessage = useMemo(() => (secretFieldStrength > 0 ? secretFieldMessage(secretFieldStrength) : regularFieldMessage(regularFieldStrength)), [regularFieldStrength, secretFieldStrength]);
-  const dynamicBackground = useMemo(() => backgroundFromField(fieldStrength), [fieldStrength]);
+  const fluctuationMultiplier = useMemo(() => 1 + Math.sin(refreshTick * 1.618) * 0.05, [refreshTick]);
+  const displayFieldStrength = useMemo(() => Math.max(fieldStrength * fluctuationMultiplier, 0), [fieldStrength, fluctuationMultiplier]);
+  const displayRegularStrength = useMemo(() => Math.max(regularFieldStrength * fluctuationMultiplier, 0), [regularFieldStrength, fluctuationMultiplier]);
+  const displaySecretStrength = useMemo(() => Math.max(secretFieldStrength * fluctuationMultiplier, 0), [secretFieldStrength, fluctuationMultiplier]);
+  const statusMessage = useMemo(() => (displaySecretStrength > 0 ? secretFieldMessage(displaySecretStrength) : regularFieldMessage(displayRegularStrength)), [displayRegularStrength, displaySecretStrength]);
+  const dynamicBackground = useMemo(() => backgroundFromField(displayFieldStrength), [displayFieldStrength]);
   const pulsesPerSecond = useMemo(() => {
-    if (fieldStrength <= 0) return 0;
-    return Math.min(0.8 + fieldStrength / 1100, 8);
-  }, [fieldStrength]);
-  const fieldNumberColor = useMemo(() => rgbToCss(colorFromStops(fieldStrength, FIELD_NUMBER_STOPS)), [fieldStrength]);
-  const pulseRingColor = useMemo(() => rgbToCss(colorFromStops(fieldStrength, PULSE_RING_STOPS)), [fieldStrength]);
-  const uiSurfaceColor = useMemo(() => rgbToCss(colorFromStops(fieldStrength, BACKGROUND_STOPS), 0.2), [fieldStrength]);
-  const uiBorderGlow = useMemo(() => rgbToCss(colorFromStops(fieldStrength, PULSE_RING_STOPS), 0.48), [fieldStrength]);
-  const numberShake = useMemo(() => shakeStrength(fieldStrength), [fieldStrength]);
-  const ringShake = useMemo(() => shakeStrength(fieldStrength), [fieldStrength]);
+    if (displayFieldStrength <= 0) return 0;
+    return Math.min(0.8 + displayFieldStrength / 1100, 8);
+  }, [displayFieldStrength]);
+  const fieldNumberColor = useMemo(() => rgbToCss(colorFromStops(displayFieldStrength, FIELD_NUMBER_STOPS)), [displayFieldStrength]);
+  const pulseRingColor = useMemo(() => rgbToCss(colorFromStops(displayFieldStrength, PULSE_RING_STOPS)), [displayFieldStrength]);
+  const uiSurfaceColor = useMemo(() => rgbToCss(colorFromStops(displayFieldStrength, BACKGROUND_STOPS), 0.2), [displayFieldStrength]);
+  const uiBorderGlow = useMemo(() => rgbToCss(colorFromStops(displayFieldStrength, PULSE_RING_STOPS), 0.48), [displayFieldStrength]);
+  const numberShake = useMemo(() => shakeStrength(displayFieldStrength), [displayFieldStrength]);
+  const ringShake = useMemo(() => shakeStrength(displayFieldStrength), [displayFieldStrength]);
+  const electricOrbActive = displayFieldStrength >= 5000;
+  const shootingStarActive = displayFieldStrength >= 13500;
+  const electricUiActive = displayFieldStrength >= 8500;
+  const orbScale = useMemo(() => 1 + Math.min(displayFieldStrength / 18000, 0.2) + Math.sin(refreshTick * 1.7) * 0.03, [displayFieldStrength, refreshTick]);
+  const backdropDriftSeconds = useMemo(() => Math.max(16 - Math.min(displayFieldStrength / 1100, 11), 4), [displayFieldStrength]);
   const isLoadingField = !hasInitialFix && !simulatedPosition && !spoofActive && !error;
+
+  useEffect(() => {
+    document.title = `${isLoadingField ? "..." : formatField(displayFieldStrength)} CLT Magnetic Field`;
+  }, [displayFieldStrength, isLoadingField]);
 
   const submitTeleport = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -412,9 +448,23 @@ export default function Home() {
         ["--orb-accent" as string]: pulseRingColor,
         ["--orb-value" as string]: fieldNumberColor,
         ["--orb-surface" as string]: uiSurfaceColor,
-        ["--orb-glow" as string]: uiBorderGlow
+        ["--orb-glow" as string]: uiBorderGlow,
+        ["--drift-speed" as string]: `${backdropDriftSeconds}s`,
+        ["--ui-electric-opacity" as string]: electricUiActive ? "1" : "0"
       }}
     >
+      <div className="space-particles" aria-hidden>
+        {BACKDROP_PARTICLES.map((particle, index) => (
+          <span
+            key={`${particle.symbol}-${index}`}
+            className="space-particle"
+            style={{ top: particle.top, left: particle.left, animationDelay: particle.delay }}
+          >
+            {particle.symbol}
+          </span>
+        ))}
+      </div>
+      <div className="ui-electric" aria-hidden />
       <h1
         onClick={() => {
           const next = titleTapCount + 1;
@@ -433,14 +483,16 @@ export default function Home() {
       <section className={`field-core ${isLoadingField ? "is-loading" : ""}`}>
         <div className="field-particles" />
         <div
-          className="field-orb"
+          className={`field-orb ${electricOrbActive ? "field-orb-electric" : ""} ${shootingStarActive ? "field-orb-stars" : ""}`}
           style={{
             ["--ring-color" as string]: pulseRingColor,
             ["--ring-glow" as string]: rgbToCss(colorFromStops(fieldStrength, PULSE_RING_STOPS), 0.85),
             ["--shake-distance" as string]: `${ringShake}px`,
             ["--pulse-speed" as string]: pulsesPerSecond > 0 ? `${Math.max(1 / pulsesPerSecond, 0.12)}s` : "1.2s",
+            ["--meter-speed" as string]: `${Math.max(0.25, 0.8 - Math.min(displayFieldStrength / 20000, 0.5))}s`,
+            transform: `scale(${orbScale})`,
             animationPlayState: pulsesPerSecond > 0 || isLoadingField ? "running" : "paused",
-            opacity: fieldStrength <= 0 ? 0.8 : 1
+            opacity: displayFieldStrength <= 0 ? 0.8 : 1
           }}
         >
           <span className="field-ring field-ring-a" />
@@ -449,7 +501,7 @@ export default function Home() {
           <span className="field-core-dot" />
           <span className="field-scanline" />
         </div>
-        <div className="field-meter" aria-hidden>
+        <div className="field-meter" aria-hidden style={{ ["--meter-color" as string]: pulseRingColor }}>
           <span />
           <span />
           <span />
@@ -457,7 +509,7 @@ export default function Home() {
           <span />
         </div>
         <p className="field-value" style={{ color: fieldNumberColor, ["--shake-distance" as string]: `${numberShake}px` }}>
-          {isLoadingField ? "..." : formatField(fieldStrength)}
+          {isLoadingField ? "..." : formatField(displayFieldStrength)}
         </p>
         <p className="field-label">CLT Magnetic Field™</p>
         <p className="field-status">{isLoadingField ? "Calibrating magnetic sensors..." : statusMessage}</p>
