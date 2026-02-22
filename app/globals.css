@@ -39,6 +39,23 @@ h1 {
   margin-bottom: 1rem;
 }
 
+.sim-toggle-bottom {
+  margin-top: 1rem;
+}
+
+.target-selector {
+  margin-top: 1rem;
+  width: min(500px, 94vw);
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.target-active {
+  border-color: #f43f5e;
+  box-shadow: 0 0 0 1px #f43f5e;
+}
+
 .field-core {
   width: min(420px, 94vw);
   border-radius: 16px;
@@ -130,7 +147,8 @@ h1 {
 }
 
 @media (max-width: 520px) {
-  .preset-row {
+  .preset-row,
+  .target-selector {
     grid-template-columns: 1fr;
   }
 }

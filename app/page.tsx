@@ -18,11 +18,23 @@ type MagneticSource = {
   }>;
 };
 
+type CompassTarget = {
+  label: string;
+  center: Coordinates;
+};
+
 const CHARLOTTE: Coordinates = { lat: 35.22867647481079, lon: -80.84490976473366 };
 const EASTER_EGG: Coordinates = { lat: 49.2729341959022, lon: -123.06941193669999 };
 const CHARLOTTE_MI: Coordinates = { lat: 42.56318196348821, lon: -84.83584647437215 };
 const PACIFIC_FIELD: Coordinates = { lat: 53.255510249854304, lon: -132.08947116604432 };
 const CARIBBEAN_FIELD: Coordinates = { lat: 18.34185490966226, lon: -64.9316281681369 };
+
+const COMPASS_TARGETS: CompassTarget[] = [
+  { label: "Charlotte, NC", center: CHARLOTTE },
+  { label: "Charlotte, MI", center: CHARLOTTE_MI },
+  { label: "Haida Gwaii Islands", center: PACIFIC_FIELD },
+  { label: "Charlotte Amalie, US Virgin Islands", center: CARIBBEAN_FIELD }
+];
 
 const MAGNETIC_SOURCES: MagneticSource[] = [
   {
@@ -80,6 +92,7 @@ const MAGNETIC_SOURCES: MagneticSource[] = [
 const EARTH_RADIUS_KM = 6371;
 
 const toRad = (deg: number) => (deg * Math.PI) / 180;
+const toDeg = (rad: number) => (rad * 180) / Math.PI;
 
 function distanceKm(a: Coordinates, b: Coordinates) {
   const dLat = toRad(b.lat - a.lat);
@@ -92,6 +105,18 @@ function distanceKm(a: Coordinates, b: Coordinates) {
     Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
 
   return 2 * EARTH_RADIUS_KM * Math.atan2(Math.sqrt(hav), Math.sqrt(1 - hav));
+}
+
+
+function bearingDeg(from: Coordinates, to: Coordinates) {
+  const lat1 = toRad(from.lat);
+  const lat2 = toRad(to.lat);
+  const dLon = toRad(to.lon - from.lon);
+
+  const y = Math.sin(dLon) * Math.cos(lat2);
+  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+
+  return (toDeg(Math.atan2(y, x)) + 360) % 360;
 }
 
 function lerp(start: number, end: number, t: number) {
@@ -191,6 +216,7 @@ export default function Home() {
   const [simLatInput, setSimLatInput] = useState("");
   const [simLonInput, setSimLonInput] = useState("");
   const [simulatedPosition, setSimulatedPosition] = useState<Coordinates | null>(null);
+  const [activeTargetIndex, setActiveTargetIndex] = useState(0);
 
   const activePosition = simulatedPosition ?? position;
 
@@ -217,6 +243,15 @@ export default function Home() {
       navigator.geolocation.clearWatch(watchId);
     };
   }, [spoofActive]);
+
+  const activeTarget = COMPASS_TARGETS[activeTargetIndex] ?? COMPASS_TARGETS[0];
+
+  const toTarget = useMemo(() => {
+    if (!activePosition) return null;
+    const distance = distanceKm(activePosition, activeTarget.center);
+    const bearing = bearingDeg(activePosition, activeTarget.center);
+    return { distance, bearing };
+  }, [activePosition, activeTarget]);
 
   const magneticBreakdown = useMemo(() => {
     if (!activePosition) return [] as Array<{ name: string; value: number; distance: number }>;
@@ -293,13 +328,10 @@ export default function Home() {
           }
         }}
       >
-        CLT Magnetic Field Tracker
+        CLT Magnetic Field
       </h1>
-      <p className="subtitle">No compass. No camera. Just raw Charlotte magnetic vibes.</p>
+      <p className="subtitle">Detect when you are near a Charlotte.</p>
 
-      <button className="sim-toggle" type="button" onClick={() => setSimulatorOpen((prev) => !prev)}>
-        {simulatorOpen ? "Hide" : "Open"} Location Simulator
-      </button>
 
       <section className="field-core">
         <div
@@ -311,28 +343,38 @@ export default function Home() {
         <p className="field-status">{statusMessage}</p>
       </section>
 
-      {activePosition && (
+      <section className="target-selector">
+        {COMPASS_TARGETS.map((target, index) => (
+          <button
+            key={target.label}
+            type="button"
+            className={index === activeTargetIndex ? "target-active" : ""}
+            onClick={() => setActiveTargetIndex(index)}
+          >
+            {target.label}
+          </button>
+        ))}
+      </section>
+
+      {toTarget && (
         <section className="stats">
           <p>
-            <strong>Active point:</strong> {activePosition.lat.toFixed(12)}, {activePosition.lon.toFixed(12)}
+            <strong>Tracked location:</strong> {activeTarget.label}
+          </p>
+          <p>
+            <strong>Distance:</strong> {toTarget.distance.toFixed(2)} km
+          </p>
+          <p>
+            <strong>Heading:</strong> {toTarget.bearing.toFixed(2)}°
           </p>
           {simulatedPosition && <p className="badge">Simulator active (using simulated location)</p>}
           {spoofActive && <p className="badge">Secret teleport spoof active</p>}
         </section>
       )}
 
-      {magneticBreakdown.length > 0 && (
-        <section className="stats">
-          <p>
-            <strong>Field contributors</strong>
-          </p>
-          {magneticBreakdown.map((entry) => (
-            <p key={entry.name}>
-              {entry.name}: {formatField(entry.value)} ({entry.distance.toFixed(1)} km)
-            </p>
-          ))}
-        </section>
-      )}
+      <button className="sim-toggle sim-toggle-bottom" type="button" onClick={() => setSimulatorOpen((prev) => !prev)}>
+        {simulatorOpen ? "Hide" : "Open"} Location Simulator
+      </button>
 
       {simulatorOpen && (
         <form onSubmit={submitSimulator} className="teleport">
