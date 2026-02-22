@@ -127,15 +127,17 @@ h1 {
   pointer-events: none;
 }
 
-.ar-arrow {
+.ar-horizon-line {
   position: absolute;
   top: 50%;
   left: 50%;
-  transform-origin: center;
-  font-size: clamp(2.6rem, 8vw, 4rem);
-  color: #fb7185;
-  text-shadow: 0 0 15px rgba(251, 113, 133, 0.65);
-  animation: arrow-pulse 1s ease-in-out infinite;
+  width: 220vmax;
+  height: 6px;
+  transform-origin: 0 50%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(251, 113, 133, 0.98) 0%, rgba(251, 113, 133, 0.9) 45%, rgba(251, 113, 133, 0.2) 100%);
+  box-shadow: 0 0 10px rgba(251, 113, 133, 0.8), 0 0 28px rgba(250, 204, 21, 0.35);
+  animation: horizon-pulse 1s ease-in-out infinite;
 }
 
 .ar-label {
@@ -153,7 +155,7 @@ h1 {
   padding: 0.45rem;
 }
 
-@keyframes arrow-pulse {
+@keyframes horizon-pulse {
   0%,
   100% {
     filter: drop-shadow(0 0 0 rgba(250, 204, 21, 0.1));

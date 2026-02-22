@@ -557,15 +557,13 @@ export default function Home() {
         <video ref={videoRef} className="camera-feed" autoPlay muted playsInline />
         <div className="camera-overlay">
           <div
-            className="ar-arrow"
+            className="ar-horizon-line"
             style={{
               transform: `translate(-50%, -50%) rotate(${relativeBearing}deg)`,
               animationDuration: pulsesPerSecond > 0 ? `${Math.max(1 / pulsesPerSecond, 0.12)}s` : undefined
             }}
-          >
-            ➤
-          </div>
-          <p className="ar-label">Point your phone to follow the Charlotte arrow</p>
+          />
+          <p className="ar-label">Rotate until the horizon line points toward Charlotte</p>
         </div>
       </section>
 
