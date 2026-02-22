@@ -39,9 +39,13 @@ h1 {
   margin-bottom: 1rem;
 }
 
+.sim-toggle-bottom {
+  margin-top: 1rem;
+}
+
 .target-selector {
-  margin-bottom: 1rem;
-  width: min(500px, 92vw);
+  margin-top: 1rem;
+  width: min(500px, 94vw);
   display: grid;
   gap: 0.5rem;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -52,11 +56,51 @@ h1 {
   box-shadow: 0 0 0 1px #f43f5e;
 }
 
-.compass {
-  width: min(320px, 90vw);
-  height: auto;
+.field-core {
+  width: min(420px, 94vw);
   border-radius: 16px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  border: 1px solid #334155;
+  background: rgba(2, 6, 23, 0.62);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.4);
+  padding: 1rem;
+}
+
+.field-pulse {
+  width: 90px;
+  height: 90px;
+  margin: 0 auto 0.5rem;
+  border-radius: 999px;
+  border: 2px solid #fb7185;
+  box-shadow: 0 0 20px rgba(251, 113, 133, 0.8);
+  animation: field-pulse 1s ease-in-out infinite;
+}
+
+.field-value {
+  font-size: clamp(2rem, 8vw, 3.2rem);
+  font-weight: 800;
+  margin: 0;
+}
+
+.field-label {
+  margin: 0.2rem 0 0.8rem;
+  color: #cbd5e1;
+}
+
+.field-status {
+  margin: 0;
+  font-weight: 700;
+}
+
+@keyframes field-pulse {
+  0%,
+  100% {
+    transform: scale(0.82);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.02);
+    opacity: 1;
+  }
 }
 
 .stats {
@@ -65,7 +109,7 @@ h1 {
   border: 1px solid #334155;
   border-radius: 14px;
   padding: 0.8rem 1rem;
-  width: min(400px, 92vw);
+  width: min(420px, 94vw);
   text-align: left;
 }
 
@@ -76,7 +120,7 @@ h1 {
 
 .teleport {
   margin-top: 1rem;
-  width: min(400px, 92vw);
+  width: min(420px, 94vw);
   display: grid;
   gap: 0.5rem;
   background: rgba(30, 41, 59, 0.9);
@@ -103,8 +147,8 @@ h1 {
 }
 
 @media (max-width: 520px) {
-  .target-selector,
-  .preset-row {
+  .preset-row,
+  .target-selector {
     grid-template-columns: 1fr;
   }
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 
 type Coordinates = {
   lat: number;
@@ -24,7 +24,7 @@ type CompassTarget = {
 };
 
 const CHARLOTTE: Coordinates = { lat: 35.22867647481079, lon: -80.84490976473366 };
-const EASTER_EGG: Coordinates = { lat: 49.2729341959022, lon: -123.06941193669999 }; // Secret Vancouver anomaly
+const EASTER_EGG: Coordinates = { lat: 49.2729341959022, lon: -123.06941193669999 };
 const CHARLOTTE_MI: Coordinates = { lat: 42.56318196348821, lon: -84.83584647437215 };
 const PACIFIC_FIELD: Coordinates = { lat: 53.255510249854304, lon: -132.08947116604432 };
 const CARIBBEAN_FIELD: Coordinates = { lat: 18.34185490966226, lon: -64.9316281681369 };
@@ -107,6 +107,7 @@ function distanceKm(a: Coordinates, b: Coordinates) {
   return 2 * EARTH_RADIUS_KM * Math.atan2(Math.sqrt(hav), Math.sqrt(1 - hav));
 }
 
+
 function bearingDeg(from: Coordinates, to: Coordinates) {
   const lat1 = toRad(from.lat);
   const lat2 = toRad(to.lat);
@@ -139,12 +140,71 @@ function formatField(value: number) {
   return value.toFixed(3);
 }
 
-export default function Home() {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+type Rgb = { r: number; g: number; b: number };
 
+const BACKGROUND_STOPS: Array<{ value: number; color: string }> = [
+  { value: 0, color: "#000000" },
+  { value: 30, color: "#3f0000" },
+  { value: 140, color: "#b91c1c" },
+  { value: 300, color: "#f97316" },
+  { value: 1000, color: "#facc15" },
+  { value: 15000, color: "#2563eb" }
+];
+
+function hexToRgb(hex: string): Rgb {
+  const normalized = hex.replace("#", "");
+  return {
+    r: Number.parseInt(normalized.slice(0, 2), 16),
+    g: Number.parseInt(normalized.slice(2, 4), 16),
+    b: Number.parseInt(normalized.slice(4, 6), 16)
+  };
+}
+
+function mixRgb(start: Rgb, end: Rgb, t: number): Rgb {
+  return {
+    r: Math.round(lerp(start.r, end.r, t)),
+    g: Math.round(lerp(start.g, end.g, t)),
+    b: Math.round(lerp(start.b, end.b, t))
+  };
+}
+
+function rgbToCss(rgb: Rgb, alpha = 1) {
+  return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`;
+}
+
+function fieldMessage(value: number) {
+  if (value <= 0) return "You're not near any Charlotte.";
+  if (value < 100) return "You feel a slight force of Charlotte...";
+  if (value < 199) return "The force is getting stronger...";
+  if (value < 500) return "You enter the sphere of influence.";
+  if (value < 1000) return "CHARLOTTE!!!! YAY!!!!!";
+  if (value < 3000) return "Why is there a stronger Charlotte nearby...?";
+  if (value < 14000) return "The Force is IMMENSE...!";
+  return "YOU FEEL A STRONG CHARLOTTE LOCATION!!!!!!!!!";
+}
+
+function backgroundFromField(value: number) {
+  const clampedValue = Math.max(value, 0);
+
+  if (clampedValue <= BACKGROUND_STOPS[0].value) {
+    const base = hexToRgb(BACKGROUND_STOPS[0].color);
+    return `radial-gradient(circle at 20% 20%, ${rgbToCss(base, 0.5)} 0%, ${rgbToCss(base)} 75%)`;
+  }
+
+  const upperStop = BACKGROUND_STOPS.find((stop) => clampedValue <= stop.value) ?? BACKGROUND_STOPS[BACKGROUND_STOPS.length - 1];
+  const upperIndex = BACKGROUND_STOPS.indexOf(upperStop);
+  const lowerStop = BACKGROUND_STOPS[Math.max(upperIndex - 1, 0)];
+  const span = Math.max(upperStop.value - lowerStop.value, 1);
+  const t = Math.min(Math.max((clampedValue - lowerStop.value) / span, 0), 1);
+
+  const mixed = mixRgb(hexToRgb(lowerStop.color), hexToRgb(upperStop.color), t);
+  const glow = mixRgb(mixed, { r: 255, g: 255, b: 255 }, 0.2);
+  return `radial-gradient(circle at 20% 20%, ${rgbToCss(glow, 0.55)} 0%, ${rgbToCss(mixed, 0.95)} 70%)`;
+}
+
+export default function Home() {
   const [position, setPosition] = useState<Coordinates | null>(null);
-  const [heading, setHeading] = useState<number>(0);
-  const [error, setError] = useState<string>("");
+  const [error, setError] = useState("");
 
   const [teleportVisible, setTeleportVisible] = useState(false);
   const [latInput, setLatInput] = useState("");
@@ -158,7 +218,6 @@ export default function Home() {
   const [simulatedPosition, setSimulatedPosition] = useState<Coordinates | null>(null);
   const [activeTargetIndex, setActiveTargetIndex] = useState(0);
 
-  const compassDisabled = simulatedPosition !== null;
   const activePosition = simulatedPosition ?? position;
 
   useEffect(() => {
@@ -180,23 +239,8 @@ export default function Home() {
       { enableHighAccuracy: true }
     );
 
-    const onOrientation = (event: DeviceOrientationEvent) => {
-      const webkitHeading = (event as DeviceOrientationEvent & { webkitCompassHeading?: number }).webkitCompassHeading;
-      if (typeof webkitHeading === "number") {
-        setHeading((360 - webkitHeading) % 360);
-        return;
-      }
-
-      if (event.alpha !== null) {
-        setHeading((360 - event.alpha + 360) % 360);
-      }
-    };
-
-    window.addEventListener("deviceorientation", onOrientation);
-
     return () => {
       navigator.geolocation.clearWatch(watchId);
-      window.removeEventListener("deviceorientation", onOrientation);
     };
   }, [spoofActive]);
 
@@ -210,77 +254,18 @@ export default function Home() {
   }, [activePosition, activeTarget]);
 
   const magneticBreakdown = useMemo(() => {
-    if (!activePosition) return [] as Array<{ name: string; value: number }>;
+    if (!activePosition) return [] as Array<{ name: string; value: number; distance: number }>;
 
     return MAGNETIC_SOURCES.map((source) => {
       const dist = distanceKm(activePosition, source.center);
-      return { name: source.name, value: magneticValueFromBands(dist, source.bands) };
-    });
+      return { name: source.name, value: magneticValueFromBands(dist, source.bands), distance: dist };
+    }).sort((a, b) => b.value - a.value);
   }, [activePosition]);
 
   const fieldStrength = useMemo(() => magneticBreakdown.reduce((sum, item) => sum + item.value, 0), [magneticBreakdown]);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || !toTarget) return;
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const size = 320;
-    canvas.width = size;
-    canvas.height = size;
-
-    const center = size / 2;
-    const radius = 140;
-
-    ctx.clearRect(0, 0, size, size);
-    ctx.fillStyle = "#0b1220";
-    ctx.fillRect(0, 0, size, size);
-
-    if (compassDisabled) {
-      ctx.strokeStyle = "#4a5d85";
-      ctx.lineWidth = 3;
-      ctx.strokeRect(16, 16, size - 32, size - 32);
-      ctx.fillStyle = "#fbbf24";
-      ctx.font = "600 18px Inter, sans-serif";
-      ctx.fillText("Compass Disabled", 86, 150);
-      ctx.fillStyle = "#bfdbfe";
-      ctx.font = "500 14px Inter, sans-serif";
-      ctx.fillText("Simulator mode is active", 82, 176);
-      return;
-    }
-
-    ctx.strokeStyle = "#4a5d85";
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.arc(center, center, radius, 0, 2 * Math.PI);
-    ctx.stroke();
-
-    ctx.fillStyle = "#dbeafe";
-    ctx.font = "600 16px Inter, sans-serif";
-    ctx.fillText("N", center - 7, center - radius + 20);
-
-    const targetAngle = toRad(toTarget.bearing - heading - 90);
-    const tipX = center + Math.cos(targetAngle) * (radius - 10);
-    const tipY = center + Math.sin(targetAngle) * (radius - 10);
-
-    ctx.strokeStyle = "#fb7185";
-    ctx.lineWidth = 5;
-    ctx.beginPath();
-    ctx.moveTo(center, center);
-    ctx.lineTo(tipX, tipY);
-    ctx.stroke();
-
-    ctx.fillStyle = "#fb7185";
-    ctx.beginPath();
-    ctx.arc(tipX, tipY, 7, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = "#bfdbfe";
-    ctx.font = "500 14px Inter, sans-serif";
-    ctx.fillText(activeTarget.label, center - 70, center + radius + 25);
-  }, [activeTarget.label, compassDisabled, heading, toTarget]);
+  const statusMessage = useMemo(() => fieldMessage(fieldStrength), [fieldStrength]);
+  const dynamicBackground = useMemo(() => backgroundFromField(fieldStrength), [fieldStrength]);
+  const pulsesPerSecond = useMemo(() => Math.min(fieldStrength / 1000, 8), [fieldStrength]);
 
   const submitTeleport = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -332,7 +317,7 @@ export default function Home() {
   };
 
   return (
-    <main className="page">
+    <main className="page" style={{ background: dynamicBackground }}>
       <h1
         onClick={() => {
           const next = titleTapCount + 1;
@@ -343,15 +328,20 @@ export default function Home() {
           }
         }}
       >
-        Charlotte Finder Compass
+        CLT Magnetic Field
       </h1>
-      <p className="subtitle">Qibla-style direction finder for Charlotte, North Carolina.</p>
+      <p className="subtitle">Detect when you are near a Charlotte.</p>
 
-      <button className="sim-toggle" type="button" onClick={() => setSimulatorOpen((prev) => !prev)}>
-        {simulatorOpen ? "Hide" : "Open"} Location Simulator
-      </button>
 
-      <canvas ref={canvasRef} className="compass" />
+      <section className="field-core">
+        <div
+          className="field-pulse"
+          style={{ animationDuration: pulsesPerSecond > 0 ? `${Math.max(1 / pulsesPerSecond, 0.12)}s` : undefined }}
+        />
+        <p className="field-value">{formatField(fieldStrength)}</p>
+        <p className="field-label">CLT Magnetic Field™</p>
+        <p className="field-status">{statusMessage}</p>
+      </section>
 
       <section className="target-selector">
         {COMPASS_TARGETS.map((target, index) => (
@@ -369,24 +359,22 @@ export default function Home() {
       {toTarget && (
         <section className="stats">
           <p>
-            <strong>Compass target:</strong> {activeTarget.label}
-          </p>
-          <p>
-            <strong>Active point:</strong> {activePosition?.lat.toFixed(12)}, {activePosition?.lon.toFixed(12)}
-          </p>
-          <p>
-            <strong>Bearing:</strong> {toTarget.bearing.toFixed(2)}°
+            <strong>Tracked location:</strong> {activeTarget.label}
           </p>
           <p>
             <strong>Distance:</strong> {toTarget.distance.toFixed(2)} km
           </p>
           <p>
-            <strong>CLT Magnetic FIeld™:</strong> {formatField(fieldStrength)}
+            <strong>Heading:</strong> {toTarget.bearing.toFixed(2)}°
           </p>
-          {simulatedPosition && <p className="badge">Simulator active (compass disabled)</p>}
+          {simulatedPosition && <p className="badge">Simulator active (using simulated location)</p>}
           {spoofActive && <p className="badge">Secret teleport spoof active</p>}
         </section>
       )}
+
+      <button className="sim-toggle sim-toggle-bottom" type="button" onClick={() => setSimulatorOpen((prev) => !prev)}>
+        {simulatorOpen ? "Hide" : "Open"} Location Simulator
+      </button>
 
       {simulatorOpen && (
         <form onSubmit={submitSimulator} className="teleport">
