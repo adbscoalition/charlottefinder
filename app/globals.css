@@ -106,6 +106,16 @@ h2 {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.password-lock {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.password-lock label {
+  display: grid;
+  gap: 0.3rem;
+}
+
 .target-active {
   border-color: var(--orb-accent);
   box-shadow: 0 0 0 1px var(--orb-accent), 0 0 18px color-mix(in oklab, transparent 55%, var(--orb-glow));
@@ -310,6 +320,14 @@ h2 {
 .badge {
   color: color-mix(in oklab, #facc15 55%, var(--orb-accent));
   font-weight: 600;
+}
+
+.offtime-toggle {
+  display: flex;
+  gap: 0.55rem;
+  align-items: center;
+  margin-top: 0.7rem;
+  font-size: 0.92rem;
 }
 
 .teleport {

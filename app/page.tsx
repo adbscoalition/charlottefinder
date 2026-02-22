@@ -132,6 +132,14 @@ const MAGNETIC_SOURCES: MagneticSource[] = [
   }
 ];
 
+const LOCATION_PASSWORD = "67416741";
+const VANCOUVER_WEAKENED_BANDS: MagneticSource["bands"] = [
+  { startKm: 0, endKm: 0.01, startValue: 5000, endValue: 5000 },
+  { startKm: 0.01, endKm: 0.1, startValue: 5000, endValue: 100 },
+  { startKm: 0.1, endKm: 0.5, startValue: 100, endValue: 10 },
+  { startKm: 0.5, endKm: 2.5, startValue: 10, endValue: 0 }
+];
+
 const EARTH_RADIUS_KM = 6371;
 
 const toRad = (deg: number) => (deg * Math.PI) / 180;
@@ -294,7 +302,35 @@ function isPstMicroSecretActive(now = new Date()) {
   const hour = Number(parts.find((part) => part.type === "hour")?.value ?? "0");
   const minute = Number(parts.find((part) => part.type === "minute")?.value ?? "0");
   const totalMinutes = hour * 60 + minute;
-  return totalMinutes >= 10 * 60 + 30 && totalMinutes < 19 * 60;
+  return totalMinutes >= 10 * 60 && totalMinutes < 19 * 60;
+}
+
+function isPstMicroSecretToggleWindow(now = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Los_Angeles",
+    hour12: false,
+    hour: "2-digit",
+    minute: "2-digit"
+  }).formatToParts(now);
+
+  const hour = Number(parts.find((part) => part.type === "hour")?.value ?? "0");
+  const minute = Number(parts.find((part) => part.type === "minute")?.value ?? "0");
+  const totalMinutes = hour * 60 + minute;
+  return totalMinutes >= 19 * 60 || totalMinutes < 10 * 60;
+}
+
+function isPstVancouverFieldWeakened(now = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Los_Angeles",
+    hour12: false,
+    hour: "2-digit",
+    minute: "2-digit"
+  }).formatToParts(now);
+
+  const hour = Number(parts.find((part) => part.type === "hour")?.value ?? "0");
+  const minute = Number(parts.find((part) => part.type === "minute")?.value ?? "0");
+  const totalMinutes = hour * 60 + minute;
+  return totalMinutes >= 19 * 60 + 30 || totalMinutes < 9 * 60 + 15;
 }
 
 function backgroundFromField(value: number) {
@@ -331,6 +367,9 @@ export default function Home() {
   const [simLonInput, setSimLonInput] = useState("");
   const [simulatedPosition, setSimulatedPosition] = useState<Coordinates | null>(null);
   const [activeTargetIndex, setActiveTargetIndex] = useState(0);
+  const [locationPasswordInput, setLocationPasswordInput] = useState("");
+  const [locationChangerUnlocked, setLocationChangerUnlocked] = useState(false);
+  const [microSecretOfftimeEnabled, setMicroSecretOfftimeEnabled] = useState(false);
 
   const activePosition = simulatedPosition ?? position;
 
@@ -381,14 +420,19 @@ export default function Home() {
   const magneticBreakdown = useMemo(() => {
     if (!activePosition) return [] as Array<{ name: string; value: number; distance: number; category: MagneticSource["category"] }>;
 
+    const microSecretActive = isPstMicroSecretActive() || (isPstMicroSecretToggleWindow() && microSecretOfftimeEnabled);
+    const vancouverWeakened = isPstVancouverFieldWeakened();
+
     return MAGNETIC_SOURCES.map((source) => {
-      if (source.name === "Vancouver Micro Secret" && !isPstMicroSecretActive()) {
+      if (source.name === "Vancouver Micro Secret" && !microSecretActive) {
         return { name: source.name, value: 0, distance: Number.POSITIVE_INFINITY, category: source.category };
       }
+
       const dist = distanceKm(activePosition, source.center);
-      return { name: source.name, value: magneticValueFromBands(dist, source.bands), distance: dist, category: source.category };
+      const bands = source.name === "Vancouver Easter Egg" && vancouverWeakened ? VANCOUVER_WEAKENED_BANDS : source.bands;
+      return { name: source.name, value: magneticValueFromBands(dist, bands), distance: dist, category: source.category };
     }).sort((a, b) => b.value - a.value);
-  }, [activePosition]);
+  }, [activePosition, microSecretOfftimeEnabled]);
 
   const fieldStrength = useMemo(() => magneticBreakdown.reduce((sum, item) => sum + item.value, 0), [magneticBreakdown]);
   const regularFieldStrength = useMemo(() => magneticBreakdown.filter((item) => item.category === "regular").reduce((sum, item) => sum + item.value, 0), [magneticBreakdown]);
@@ -471,6 +515,17 @@ export default function Home() {
     setError("");
   };
 
+  const unlockLocationChanger = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (locationPasswordInput === LOCATION_PASSWORD) {
+      setLocationChangerUnlocked(true);
+      setLocationPasswordInput("");
+      setError("");
+      return;
+    }
+    setError("Incorrect location changer password.");
+  };
+
   return (
     <main
       className="page"
@@ -551,18 +606,33 @@ export default function Home() {
         <summary>
           Selected location: <span className="badge">{activeTarget.label}</span>
         </summary>
-        <section className="target-selector">
-          {COMPASS_TARGETS.map((target, index) => (
-            <button
-              key={target.label}
-              type="button"
-              className={index === activeTargetIndex ? "target-active" : ""}
-              onClick={() => setActiveTargetIndex(index)}
-            >
-              {target.label}
-            </button>
-          ))}
-        </section>
+        {!locationChangerUnlocked ? (
+          <form className="password-lock" onSubmit={unlockLocationChanger}>
+            <label>
+              Location changer password
+              <input
+                type="password"
+                value={locationPasswordInput}
+                onChange={(event) => setLocationPasswordInput(event.target.value)}
+                placeholder="Enter password"
+              />
+            </label>
+            <button type="submit">Unlock Location Changer</button>
+          </form>
+        ) : (
+          <section className="target-selector">
+            {COMPASS_TARGETS.map((target, index) => (
+              <button
+                key={target.label}
+                type="button"
+                className={index === activeTargetIndex ? "target-active" : ""}
+                onClick={() => setActiveTargetIndex(index)}
+              >
+                {target.label}
+              </button>
+            ))}
+          </section>
+        )}
       </details>
 
       {toTarget && (
@@ -578,6 +648,16 @@ export default function Home() {
           </p>
           {simulatedPosition && <p className="badge">Simulator active (using simulated location)</p>}
           {spoofActive && <p className="badge">Secret teleport spoof active</p>}
+          {isPstMicroSecretToggleWindow() && (
+            <label className="offtime-toggle">
+              <input
+                type="checkbox"
+                checked={microSecretOfftimeEnabled}
+                onChange={(event) => setMicroSecretOfftimeEnabled(event.target.checked)}
+              />
+              Enable off-time micro secret field override (7:00pm-10:00am PST)
+            </label>
+          )}
         </section>
       )}
 
