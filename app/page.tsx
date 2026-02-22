@@ -218,7 +218,7 @@ export default function Home() {
 
   const [position, setPosition] = useState<Coordinates | null>(null);
   const [heading, setHeading] = useState<number>(0);
-  const [headingAccuracy, setHeadingAccuracy] = useState<"true-north" | "approximate" | "unknown">("unknown");
+  const [headingAccuracy, setHeadingAccuracy] = useState<"true-north" | "approximate" | "magnetometer" | "unknown">("unknown");
   const [orientationPermissionRequired, setOrientationPermissionRequired] = useState(false);
   const [orientationEnabled, setOrientationEnabled] = useState(false);
   const [error, setError] = useState<string>("");
@@ -239,6 +239,8 @@ export default function Home() {
   const [headingOffset, setHeadingOffset] = useState(0);
   const [cameraError, setCameraError] = useState("");
   const [cameraActive, setCameraActive] = useState(false);
+  const [magnetometerAvailable, setMagnetometerAvailable] = useState(false);
+  const [magnetometerEnabled, setMagnetometerEnabled] = useState(false);
 
   useEffect(() => {
     if (!navigator.geolocation) {
@@ -279,6 +281,7 @@ export default function Home() {
     if (!orientationEnabled) return;
 
     const onOrientation = (event: DeviceOrientationEvent) => {
+      if (magnetometerEnabled) return;
       const webkitHeading = (event as DeviceOrientationEvent & { webkitCompassHeading?: number }).webkitCompassHeading;
       if (typeof webkitHeading === "number" && Number.isFinite(webkitHeading)) {
         setHeading(normalizeHeading(webkitHeading));
@@ -301,7 +304,76 @@ export default function Home() {
     return () => {
       window.removeEventListener(eventName, onOrientation as EventListener);
     };
-  }, [orientationEnabled]);
+  }, [magnetometerEnabled, orientationEnabled]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const userAgent = navigator.userAgent.toLowerCase();
+    const isSamsung = userAgent.includes("samsung") || userAgent.includes("sm-");
+    const MagnetometerCtor = (window as Window & { Magnetometer?: new (options?: { frequency?: number }) => {
+      x: number | null;
+      y: number | null;
+      addEventListener: (type: "reading" | "error", listener: EventListener) => void;
+      removeEventListener: (type: "reading" | "error", listener: EventListener) => void;
+      start: () => void;
+      stop: () => void;
+    } }).Magnetometer;
+
+    if (!isSamsung || !MagnetometerCtor) {
+      setMagnetometerAvailable(false);
+      return;
+    }
+
+    setMagnetometerAvailable(true);
+    let sensor: ReturnType<typeof MagnetometerCtor> | null = null;
+
+    const startSensor = async () => {
+      try {
+        const permissionsApi = navigator.permissions as Permissions | undefined;
+        if (permissionsApi?.query) {
+          const status = await permissionsApi.query({ name: "magnetometer" as PermissionName });
+          if (status.state === "denied") return;
+        }
+      } catch {
+        // Ignore permissions API issues and try sensor start directly.
+      }
+
+      try {
+        sensor = new MagnetometerCtor({ frequency: 20 });
+      } catch {
+        return;
+      }
+
+      const onReading = () => {
+        if (!sensor || sensor.x === null || sensor.y === null) return;
+
+        const rawHeading = toDeg(Math.atan2(sensor.y, sensor.x));
+        const screenAngle = getScreenAngle();
+        const headingFromMag = normalizeHeading(rawHeading + 90 + screenAngle);
+        setHeading(headingFromMag);
+        setHeadingAccuracy("magnetometer");
+        setMagnetometerEnabled(true);
+      };
+
+      const onError = () => {
+        setMagnetometerEnabled(false);
+      };
+
+      sensor.addEventListener("reading", onReading as EventListener);
+      sensor.addEventListener("error", onError as EventListener);
+      sensor.start();
+    };
+
+    startSensor();
+
+    return () => {
+      if (sensor) {
+        sensor.stop();
+      }
+      setMagnetometerEnabled(false);
+    };
+  }, []);
 
   const enableOrientation = async () => {
     const permissionApi = DeviceOrientationEvent as typeof DeviceOrientationEvent & {
@@ -543,6 +615,9 @@ export default function Home() {
           </p>
           <p>
             <strong>Heading quality:</strong> {headingAccuracy} ({calibratedHeading.toFixed(1)}°)
+          </p>
+          <p>
+            <strong>Samsung magnetometer:</strong> {magnetometerAvailable ? (magnetometerEnabled ? "active" : "available") : "not available"}
           </p>
           <p>
             <strong>Distance:</strong> {toTarget.distance.toFixed(2)} km
