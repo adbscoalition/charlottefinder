@@ -279,6 +279,7 @@ function shakeStrength(value: number) {
 export default function Home() {
   const [position, setPosition] = useState<Coordinates | null>(null);
   const [error, setError] = useState("");
+  const [hasInitialFix, setHasInitialFix] = useState(false);
 
   const [teleportVisible, setTeleportVisible] = useState(false);
   const [latInput, setLatInput] = useState("");
@@ -305,6 +306,7 @@ export default function Home() {
         if (!spoofActive) {
           setPosition({ lat: pos.coords.latitude, lon: pos.coords.longitude });
         }
+        setHasInitialFix(true);
         setError("");
       },
       (err) => {
@@ -349,6 +351,7 @@ export default function Home() {
   const pulseRingColor = useMemo(() => rgbToCss(colorFromStops(fieldStrength, PULSE_RING_STOPS)), [fieldStrength]);
   const numberShake = useMemo(() => shakeStrength(fieldStrength), [fieldStrength]);
   const ringShake = useMemo(() => shakeStrength(fieldStrength), [fieldStrength]);
+  const isLoadingField = !hasInitialFix && !simulatedPosition && !spoofActive && !error;
 
   const submitTeleport = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -416,23 +419,37 @@ export default function Home() {
       <p className="subtitle">Detect when you are near a Charlotte.</p>
 
 
-      <section className="field-core">
+      <section className={`field-core ${isLoadingField ? "is-loading" : ""}`}>
+        <div className="field-particles" />
         <div
-          className="field-pulse"
+          className="field-orb"
           style={{
-            borderColor: pulseRingColor,
-            boxShadow: `0 0 26px ${rgbToCss(colorFromStops(fieldStrength, PULSE_RING_STOPS), 0.85)}`,
-            animationDuration: pulsesPerSecond > 0 ? `${Math.max(1 / pulsesPerSecond, 0.12)}s, 0.12s` : undefined,
-            animationPlayState: pulsesPerSecond > 0 ? "running" : "paused",
-            opacity: fieldStrength <= 0 ? 0.8 : 1,
-            ["--shake-distance" as string]: `${ringShake}px`
+            ["--ring-color" as string]: pulseRingColor,
+            ["--ring-glow" as string]: rgbToCss(colorFromStops(fieldStrength, PULSE_RING_STOPS), 0.85),
+            ["--shake-distance" as string]: `${ringShake}px`,
+            ["--pulse-speed" as string]: pulsesPerSecond > 0 ? `${Math.max(1 / pulsesPerSecond, 0.12)}s` : "1.2s",
+            animationPlayState: pulsesPerSecond > 0 || isLoadingField ? "running" : "paused",
+            opacity: fieldStrength <= 0 ? 0.8 : 1
           }}
-        />
+        >
+          <span className="field-ring field-ring-a" />
+          <span className="field-ring field-ring-b" />
+          <span className="field-ring field-ring-c" />
+          <span className="field-core-dot" />
+          <span className="field-scanline" />
+        </div>
+        <div className="field-meter" aria-hidden>
+          <span />
+          <span />
+          <span />
+          <span />
+          <span />
+        </div>
         <p className="field-value" style={{ color: fieldNumberColor, ["--shake-distance" as string]: `${numberShake}px` }}>
-          {formatField(fieldStrength)}
+          {isLoadingField ? "..." : formatField(fieldStrength)}
         </p>
         <p className="field-label">CLT Magnetic Field™</p>
-        <p className="field-status">{statusMessage}</p>
+        <p className="field-status">{isLoadingField ? "Calibrating magnetic sensors..." : statusMessage}</p>
       </section>
 
       <details className="target-list" open>

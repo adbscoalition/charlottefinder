@@ -85,6 +85,8 @@ h2 {
 }
 
 .field-core {
+  position: relative;
+  overflow: hidden;
   width: min(420px, 94vw);
   border-radius: 16px;
   border: 1px solid #334155;
@@ -93,17 +95,95 @@ h2 {
   padding: 1rem;
 }
 
-.field-pulse {
-  width: 128px;
-  height: 128px;
-  margin: 0 auto 0.5rem;
-  border-radius: 999px;
-  border: 2px solid #fb7185;
-  box-shadow: 0 0 20px rgba(251, 113, 133, 0.8);
-  animation: field-pulse 1s ease-in-out infinite, field-jitter 0.12s ease-in-out infinite;
+.field-orb {
+  width: 158px;
+  height: 158px;
+  margin: 0.2rem auto 0.6rem;
+  position: relative;
+  display: grid;
+  place-items: center;
+  --ring-color: #94a3b8;
+  --ring-glow: rgba(148, 163, 184, 0.8);
   --shake-distance: 0px;
+  --pulse-speed: 1.2s;
+  animation: field-orb-pulse var(--pulse-speed) ease-in-out infinite, field-jitter 0.12s ease-in-out infinite;
 }
 
+.field-ring {
+  position: absolute;
+  border-radius: 999px;
+  border: 2px solid var(--ring-color);
+  box-shadow: 0 0 16px var(--ring-glow);
+}
+
+.field-ring-a {
+  inset: 10px;
+  opacity: 0.95;
+}
+
+.field-ring-b {
+  inset: 28px;
+  opacity: 0.7;
+  animation: ring-spin 4s linear infinite reverse;
+}
+
+.field-ring-c {
+  inset: 48px;
+  opacity: 0.55;
+  animation: ring-spin 2.7s linear infinite;
+}
+
+.field-core-dot {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  background: radial-gradient(circle at 32% 28%, #ffffff 0%, var(--ring-color) 60%, #020617 100%);
+  box-shadow: 0 0 24px var(--ring-glow);
+}
+
+.field-scanline {
+  position: absolute;
+  width: 130px;
+  height: 2px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0), var(--ring-color), rgba(255, 255, 255, 0));
+  animation: scanline 1.4s ease-in-out infinite;
+}
+
+.field-meter {
+  width: min(240px, 80vw);
+  margin: 0 auto 0.55rem;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.35rem;
+}
+
+.field-meter span {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.25);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  animation: meter-glow 1.2s ease-in-out infinite;
+}
+
+.field-meter span:nth-child(2) { animation-delay: 0.12s; }
+.field-meter span:nth-child(3) { animation-delay: 0.24s; }
+.field-meter span:nth-child(4) { animation-delay: 0.36s; }
+.field-meter span:nth-child(5) { animation-delay: 0.48s; }
+
+.field-particles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  opacity: 0.55;
+  background-image:
+    radial-gradient(circle at 14% 22%, rgba(255, 255, 255, 0.75) 0 1px, transparent 2px),
+    radial-gradient(circle at 74% 30%, rgba(255, 255, 255, 0.55) 0 1px, transparent 2px),
+    radial-gradient(circle at 28% 78%, rgba(147, 197, 253, 0.6) 0 1.2px, transparent 2.2px),
+    radial-gradient(circle at 80% 70%, rgba(196, 181, 253, 0.58) 0 1px, transparent 2px);
+  background-size: 220px 220px;
+  animation: particle-float 12s linear infinite;
+}
 .field-value {
   font-size: clamp(2.8rem, 11vw, 4.6rem);
   font-weight: 800;
@@ -124,7 +204,13 @@ h2 {
   font-weight: 700;
 }
 
-@keyframes field-pulse {
+.field-core.is-loading .field-value,
+.field-core.is-loading .field-label,
+.field-core.is-loading .field-status {
+  animation: loading-pulse 1.25s ease-in-out infinite;
+}
+
+@keyframes field-orb-pulse {
   0%,
   100% {
     transform: scale(0.82);
@@ -226,4 +312,30 @@ button {
 
 .stat-number {
   font-family: var(--font-fira-code), monospace;
+}
+
+
+@keyframes ring-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes scanline {
+  0%, 100% { transform: translateY(-30px); opacity: 0.35; }
+  50% { transform: translateY(30px); opacity: 1; }
+}
+
+@keyframes meter-glow {
+  0%, 100% { opacity: 0.35; transform: scaleY(0.7); }
+  50% { opacity: 1; transform: scaleY(1.1); }
+}
+
+@keyframes particle-float {
+  0% { background-position: 0 0, 0 0, 0 0, 0 0; }
+  100% { background-position: -80px 60px, 70px -30px, -55px -50px, 40px 70px; }
+}
+
+@keyframes loading-pulse {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 1; }
 }
