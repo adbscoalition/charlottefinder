@@ -45,20 +45,6 @@ body {
   animation: drift-around var(--drift-speed, 12s) linear infinite;
 }
 
-.ui-electric {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  opacity: var(--ui-electric-opacity, 0);
-  transition: opacity 240ms ease;
-  background-image:
-    linear-gradient(120deg, transparent 20%, color-mix(in oklab, transparent 70%, var(--orb-accent)) 46%, transparent 52%),
-    linear-gradient(300deg, transparent 20%, color-mix(in oklab, transparent 72%, var(--orb-glow)) 45%, transparent 51%);
-  background-size: 230px 230px, 280px 280px;
-  animation: ui-electric-sweep 0.9s linear infinite;
-}
-
 .page > * {
   position: relative;
   z-index: 1;
@@ -228,21 +214,11 @@ h2 {
 }
 
 
-.field-orb-electric::before,
 .field-orb-stars::after {
   content: "";
   position: absolute;
   inset: -24px;
   pointer-events: none;
-}
-
-.field-orb-electric::before {
-  background:
-    linear-gradient(90deg, transparent 20%, color-mix(in oklab, transparent 55%, var(--ring-color)) 50%, transparent 80%),
-    linear-gradient(35deg, transparent 28%, color-mix(in oklab, transparent 50%, var(--ring-glow)) 50%, transparent 72%);
-  background-size: 90px 90px, 120px 120px;
-  animation: electric-zap 0.35s steps(2) infinite;
-  opacity: 0.7;
 }
 
 .field-orb-stars::after {
@@ -252,6 +228,16 @@ h2 {
     radial-gradient(circle at 64% 74%, color-mix(in oklab, #fff 40%, var(--ring-color)) 0 1.8px, transparent 3px);
   animation: shooting-stars 0.8s linear infinite;
   opacity: 0.8;
+}
+
+.field-orb-destabilized {
+  animation-duration: calc(var(--pulse-speed) * 0.5), 0.06s;
+  filter: hue-rotate(0deg) saturate(1.4);
+  animation-name: field-orb-pulse, field-jitter, hue-chaos;
+}
+
+.field-value-rainbow {
+  animation: field-jitter 0.06s ease-in-out infinite, hue-chaos 0.8s linear infinite;
 }
 
 .field-value {
@@ -428,18 +414,13 @@ button:active {
   100% { transform: translate(-10px, 14px) scale(0.95); }
 }
 
-@keyframes ui-electric-sweep {
-  0% { background-position: 0 0, 0 0; }
-  100% { background-position: 140px -140px, -180px 180px; }
-}
-
-@keyframes electric-zap {
-  0%, 100% { background-position: 0 0, 0 0; opacity: 0.25; }
-  50% { background-position: 35px -30px, -45px 40px; opacity: 0.8; }
-}
-
 @keyframes shooting-stars {
   0% { transform: translate(0, 0); opacity: 0.25; }
   50% { transform: translate(-16px, 14px); opacity: 0.95; }
   100% { transform: translate(-32px, 28px); opacity: 0.2; }
+}
+
+@keyframes hue-chaos {
+  0% { filter: hue-rotate(0deg); }
+  100% { filter: hue-rotate(360deg); }
 }

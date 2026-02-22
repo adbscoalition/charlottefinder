@@ -31,6 +31,7 @@ const PACIFIC_FIELD: Coordinates = { lat: 53.255510249854304, lon: -132.08947116
 const CARIBBEAN_FIELD: Coordinates = { lat: 18.34185490966226, lon: -64.9316281681369 };
 const PORT_CHARLOTTE_FL: Coordinates = { lat: 27.010523765938274, lon: -82.14259591632731 };
 const CHARLOTTETOWN_PEI: Coordinates = { lat: 46.23722371252871, lon: -63.12970137942366 };
+const VANCOUVER_MICRO_SECRET: Coordinates = { lat: 49.27295878743672, lon: -123.06939862529713 };
 
 const COMPASS_TARGETS: CompassTarget[] = [
   { label: "Charlotte, NC", center: CHARLOTTE },
@@ -117,6 +118,16 @@ const MAGNETIC_SOURCES: MagneticSource[] = [
       { startKm: 2, endKm: 8, startValue: 350, endValue: 100 },
       { startKm: 8, endKm: 24, startValue: 100, endValue: 25 },
       { startKm: 24, endKm: 128, startValue: 25, endValue: 0 }
+    ]
+  },
+  {
+    name: "Vancouver Micro Secret",
+    category: "secret",
+    center: VANCOUVER_MICRO_SECRET,
+    bands: [
+      { startKm: 0, endKm: 0.001, startValue: 300000, endValue: 300000 },
+      { startKm: 0.001, endKm: 0.01, startValue: 300000, endValue: 1 },
+      { startKm: 0.01, endKm: 0.015, startValue: 1, endValue: 0 }
     ]
   }
 ];
@@ -262,6 +273,7 @@ function regularFieldMessage(value: number) {
 }
 
 function secretFieldMessage(value: number) {
+  if (value >= 275000) return "THE GOD OF ALL CHARLOTTES!!!!!!";
   if (value <= 0) return "";
   if (value < 10) return "A magnetic field?";
   if (value < 50) return "This shouldn't be here...";
@@ -269,6 +281,20 @@ function secretFieldMessage(value: number) {
   if (value < 4000) return "ITS SPIKING AHH CHARLOTTE";
   if (value < 14000) return "THE HOLY CHARLOTTE!!!!";
   return "CHARLOTTE CHARLOTTE CHARLOTTE";
+}
+
+function isPstMicroSecretActive(now = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Los_Angeles",
+    hour12: false,
+    hour: "2-digit",
+    minute: "2-digit"
+  }).formatToParts(now);
+
+  const hour = Number(parts.find((part) => part.type === "hour")?.value ?? "0");
+  const minute = Number(parts.find((part) => part.type === "minute")?.value ?? "0");
+  const totalMinutes = hour * 60 + minute;
+  return totalMinutes >= 10 * 60 + 30 && totalMinutes < 19 * 60;
 }
 
 function backgroundFromField(value: number) {
@@ -356,6 +382,9 @@ export default function Home() {
     if (!activePosition) return [] as Array<{ name: string; value: number; distance: number; category: MagneticSource["category"] }>;
 
     return MAGNETIC_SOURCES.map((source) => {
+      if (source.name === "Vancouver Micro Secret" && !isPstMicroSecretActive()) {
+        return { name: source.name, value: 0, distance: Number.POSITIVE_INFINITY, category: source.category };
+      }
       const dist = distanceKm(activePosition, source.center);
       return { name: source.name, value: magneticValueFromBands(dist, source.bands), distance: dist, category: source.category };
     }).sort((a, b) => b.value - a.value);
@@ -380,10 +409,12 @@ export default function Home() {
   const uiBorderGlow = useMemo(() => rgbToCss(colorFromStops(displayFieldStrength, PULSE_RING_STOPS), 0.48), [displayFieldStrength]);
   const numberShake = useMemo(() => shakeStrength(displayFieldStrength), [displayFieldStrength]);
   const ringShake = useMemo(() => shakeStrength(displayFieldStrength), [displayFieldStrength]);
-  const electricOrbActive = displayFieldStrength >= 5000;
   const shootingStarActive = displayFieldStrength >= 13500;
-  const electricUiActive = displayFieldStrength >= 8500;
-  const orbScale = useMemo(() => 1 + Math.min(displayFieldStrength / 18000, 0.2) + Math.sin(refreshTick * 1.7) * 0.03, [displayFieldStrength, refreshTick]);
+  const destabilizedState = displayFieldStrength >= 150000;
+  const orbScale = useMemo(
+    () => 1 + Math.min(displayFieldStrength / 18000, 0.2) + Math.sin(refreshTick * 1.7) * (displayFieldStrength >= 150000 ? 0.08 : 0.03),
+    [displayFieldStrength, refreshTick]
+  );
   const backdropDriftSeconds = useMemo(() => Math.max(16 - Math.min(displayFieldStrength / 1100, 11), 4), [displayFieldStrength]);
   const isLoadingField = !hasInitialFix && !simulatedPosition && !spoofActive && !error;
 
@@ -449,8 +480,7 @@ export default function Home() {
         ["--orb-value" as string]: fieldNumberColor,
         ["--orb-surface" as string]: uiSurfaceColor,
         ["--orb-glow" as string]: uiBorderGlow,
-        ["--drift-speed" as string]: `${backdropDriftSeconds}s`,
-        ["--ui-electric-opacity" as string]: electricUiActive ? "1" : "0"
+        ["--drift-speed" as string]: `${backdropDriftSeconds}s`
       }}
     >
       <div className="space-particles" aria-hidden>
@@ -464,7 +494,6 @@ export default function Home() {
           </span>
         ))}
       </div>
-      <div className="ui-electric" aria-hidden />
       <h1
         onClick={() => {
           const next = titleTapCount + 1;
@@ -483,11 +512,11 @@ export default function Home() {
       <section className={`field-core ${isLoadingField ? "is-loading" : ""}`}>
         <div className="field-particles" />
         <div
-          className={`field-orb ${electricOrbActive ? "field-orb-electric" : ""} ${shootingStarActive ? "field-orb-stars" : ""}`}
+          className={`field-orb ${shootingStarActive ? "field-orb-stars" : ""} ${destabilizedState ? "field-orb-destabilized" : ""}`}
           style={{
             ["--ring-color" as string]: pulseRingColor,
-            ["--ring-glow" as string]: rgbToCss(colorFromStops(fieldStrength, PULSE_RING_STOPS), 0.85),
-            ["--shake-distance" as string]: `${ringShake}px`,
+            ["--ring-glow" as string]: rgbToCss(colorFromStops(displayFieldStrength, PULSE_RING_STOPS), 0.85),
+            ["--shake-distance" as string]: `${destabilizedState ? Math.max(ringShake, 2.6) : ringShake}px`,
             ["--pulse-speed" as string]: pulsesPerSecond > 0 ? `${Math.max(1 / pulsesPerSecond, 0.12)}s` : "1.2s",
             ["--meter-speed" as string]: `${Math.max(0.25, 0.8 - Math.min(displayFieldStrength / 20000, 0.5))}s`,
             transform: `scale(${orbScale})`,
@@ -508,7 +537,10 @@ export default function Home() {
           <span />
           <span />
         </div>
-        <p className="field-value" style={{ color: fieldNumberColor, ["--shake-distance" as string]: `${numberShake}px` }}>
+        <p
+          className={`field-value ${destabilizedState ? "field-value-rainbow" : ""}`}
+          style={{ color: fieldNumberColor, ["--shake-distance" as string]: `${destabilizedState ? Math.max(numberShake, 2.2) : numberShake}px` }}
+        >
           {isLoadingField ? "..." : formatField(displayFieldStrength)}
         </p>
         <p className="field-label">CLT Magnetic Field™</p>
