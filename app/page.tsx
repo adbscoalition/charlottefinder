@@ -343,18 +343,23 @@ export default function Home() {
         <p className="field-status">{statusMessage}</p>
       </section>
 
-      <section className="target-selector">
-        {COMPASS_TARGETS.map((target, index) => (
-          <button
-            key={target.label}
-            type="button"
-            className={index === activeTargetIndex ? "target-active" : ""}
-            onClick={() => setActiveTargetIndex(index)}
-          >
-            {target.label}
-          </button>
-        ))}
-      </section>
+      <details className="target-list" open>
+        <summary>
+          Selected location: <span className="badge">{activeTarget.label}</span>
+        </summary>
+        <section className="target-selector">
+          {COMPASS_TARGETS.map((target, index) => (
+            <button
+              key={target.label}
+              type="button"
+              className={index === activeTargetIndex ? "target-active" : ""}
+              onClick={() => setActiveTargetIndex(index)}
+            >
+              {target.label}
+            </button>
+          ))}
+        </section>
+      </details>
 
       {toTarget && (
         <section className="stats">

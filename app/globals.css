@@ -49,9 +49,31 @@ h2 {
   margin-top: 1rem;
 }
 
-.target-selector {
+
+.target-list {
   margin-top: 1rem;
   width: min(500px, 94vw);
+  border: 1px solid #334155;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.7);
+  padding: 0.5rem 0.75rem 0.75rem;
+  text-align: left;
+}
+
+.target-list summary {
+  cursor: pointer;
+  font-family: var(--font-public-sans), Arial, sans-serif;
+  font-weight: 700;
+  margin-bottom: 0.6rem;
+}
+
+.target-list[open] summary {
+  margin-bottom: 0.75rem;
+}
+
+.target-selector {
+  margin-top: 0.25rem;
+  width: 100%;
   display: grid;
   gap: 0.5rem;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -72,8 +94,8 @@ h2 {
 }
 
 .field-pulse {
-  width: 90px;
-  height: 90px;
+  width: 128px;
+  height: 128px;
   margin: 0 auto 0.5rem;
   border-radius: 999px;
   border: 2px solid #fb7185;
@@ -82,7 +104,7 @@ h2 {
 }
 
 .field-value {
-  font-size: clamp(2rem, 8vw, 3.2rem);
+  font-size: clamp(2.8rem, 11vw, 4.6rem);
   font-weight: 800;
   margin: 0;
   font-family: var(--font-fira-code), monospace;
@@ -162,6 +184,7 @@ h2 {
 
 input,
 button {
+  font-family: var(--font-public-sans), Arial, sans-serif;
   border-radius: 8px;
   border: 1px solid #475569;
   padding: 0.6rem;
