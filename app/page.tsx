@@ -214,7 +214,7 @@ function backgroundFromField(value: number) {
 }
 
 export default function Home() {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
 
   const [position, setPosition] = useState<Coordinates | null>(null);
   const [heading, setHeading] = useState<number>(0);
@@ -234,10 +234,11 @@ export default function Home() {
   const [simLonInput, setSimLonInput] = useState("");
   const [simulatedPosition, setSimulatedPosition] = useState<Coordinates | null>(null);
   const [activeTargetIndex, setActiveTargetIndex] = useState(0);
-  const [animationMs, setAnimationMs] = useState(0);
 
-  const compassDisabled = simulatedPosition !== null;
   const activePosition = simulatedPosition ?? position;
+  const [headingOffset, setHeadingOffset] = useState(0);
+  const [cameraError, setCameraError] = useState("");
+  const [cameraActive, setCameraActive] = useState(false);
 
   useEffect(() => {
     if (!navigator.geolocation) {
@@ -325,6 +326,55 @@ export default function Home() {
     }
   };
 
+
+  useEffect(() => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraError("Back camera is not available in this browser.");
+      return;
+    }
+
+    let mounted = true;
+    let stream: MediaStream | null = null;
+
+    const startCamera = async () => {
+      try {
+        const preferred = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: "environment" } },
+          audio: false
+        });
+        stream = preferred;
+      } catch {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        } catch {
+          if (mounted) {
+            setCameraError("Unable to access camera. Allow camera permission to use AR arrow mode.");
+            setCameraActive(false);
+          }
+          return;
+        }
+      }
+
+      if (!mounted || !stream) return;
+      const video = videoRef.current;
+      if (video) {
+        video.srcObject = stream;
+        await video.play().catch(() => undefined);
+      }
+      setCameraError("");
+      setCameraActive(true);
+    };
+
+    startCamera();
+
+    return () => {
+      mounted = false;
+      if (stream) {
+        for (const track of stream.getTracks()) track.stop();
+      }
+    };
+  }, []);
+
   const activeTarget = COMPASS_TARGETS[activeTargetIndex] ?? COMPASS_TARGETS[0];
 
   const toTarget = useMemo(() => {
@@ -346,94 +396,13 @@ export default function Home() {
   const fieldStrength = useMemo(() => magneticBreakdown.reduce((sum, item) => sum + item.value, 0), [magneticBreakdown]);
   const statusMessage = useMemo(() => fieldMessage(fieldStrength), [fieldStrength]);
   const dynamicBackground = useMemo(() => backgroundFromField(fieldStrength), [fieldStrength]);
+  const calibratedHeading = useMemo(() => normalizeHeading(heading + headingOffset), [heading, headingOffset]);
+  const relativeBearing = useMemo(() => {
+    if (!toTarget) return 0;
+    return normalizeHeading(toTarget.bearing - calibratedHeading);
+  }, [calibratedHeading, toTarget]);
+  const pulsesPerSecond = useMemo(() => Math.min(fieldStrength / 1000, 8), [fieldStrength]);
 
-  useEffect(() => {
-    let frameId = 0;
-
-    const animate = (time: number) => {
-      setAnimationMs(time);
-      frameId = window.requestAnimationFrame(animate);
-    };
-
-    frameId = window.requestAnimationFrame(animate);
-
-    return () => window.cancelAnimationFrame(frameId);
-  }, []);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || !toTarget) return;
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const size = 320;
-    canvas.width = size;
-    canvas.height = size;
-
-    const center = size / 2;
-    const radius = 140;
-
-    ctx.clearRect(0, 0, size, size);
-    ctx.fillStyle = "#0b1220";
-    ctx.fillRect(0, 0, size, size);
-
-    if (compassDisabled) {
-      ctx.strokeStyle = "#4a5d85";
-      ctx.lineWidth = 3;
-      ctx.strokeRect(16, 16, size - 32, size - 32);
-      ctx.fillStyle = "#fbbf24";
-      ctx.font = "600 18px Inter, sans-serif";
-      ctx.fillText("Compass Disabled", 86, 150);
-      ctx.fillStyle = "#bfdbfe";
-      ctx.font = "500 14px Inter, sans-serif";
-      ctx.fillText("Simulator mode is active", 82, 176);
-      return;
-    }
-
-    ctx.strokeStyle = "#4a5d85";
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.arc(center, center, radius, 0, 2 * Math.PI);
-    ctx.stroke();
-
-    ctx.fillStyle = "#dbeafe";
-    ctx.font = "600 16px Inter, sans-serif";
-    ctx.fillText("N", center - 7, center - radius + 20);
-
-    const targetAngle = toRad(toTarget.bearing - heading - 90);
-    const tipX = center + Math.cos(targetAngle) * (radius - 10);
-    const tipY = center + Math.sin(targetAngle) * (radius - 10);
-
-    const pulsesPerSecond = Math.min(fieldStrength / 1000, 8);
-    if (pulsesPerSecond > 0) {
-      const phase = (animationMs / 1000) * pulsesPerSecond;
-      const wave = (Math.sin(phase * Math.PI * 2) + 1) / 2;
-      const pulseRadius = 8 + wave * 28;
-
-      ctx.strokeStyle = `rgba(251, 113, 133, ${0.1 + wave * 0.45})`;
-      ctx.lineWidth = 4;
-      ctx.beginPath();
-      ctx.arc(tipX, tipY, pulseRadius, 0, Math.PI * 2);
-      ctx.stroke();
-    }
-
-    ctx.strokeStyle = "#fb7185";
-    ctx.lineWidth = 5;
-    ctx.beginPath();
-    ctx.moveTo(center, center);
-    ctx.lineTo(tipX, tipY);
-    ctx.stroke();
-
-    ctx.fillStyle = "#fb7185";
-    ctx.beginPath();
-    ctx.arc(tipX, tipY, 7, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = "#bfdbfe";
-    ctx.font = "500 14px Inter, sans-serif";
-    ctx.fillText(activeTarget.label, center - 70, center + radius + 25);
-  }, [activeTarget.label, animationMs, compassDisabled, fieldStrength, heading, toTarget]);
 
   const submitTeleport = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -512,7 +481,25 @@ export default function Home() {
 
       {!orientationEnabled && !orientationPermissionRequired && <p className="subtitle">Compass sensor unavailable.</p>}
 
-      <canvas ref={canvasRef} className="compass" />
+      <section className="camera-shell">
+        <video ref={videoRef} className="camera-feed" autoPlay muted playsInline />
+        <div className="camera-overlay">
+          <div
+            className="ar-arrow"
+            style={{
+              transform: `translate(-50%, -50%) rotate(${relativeBearing}deg)`,
+              animationDuration: pulsesPerSecond > 0 ? `${Math.max(1 / pulsesPerSecond, 0.12)}s` : undefined
+            }}
+          >
+            ➤
+          </div>
+          <p className="ar-label">Point your phone to follow the Charlotte arrow</p>
+        </div>
+      </section>
+
+      {cameraError && <p className="error">{cameraError}</p>}
+      {!cameraActive && !cameraError && <p className="subtitle">Starting back camera...</p>}
+
 
       <section className="target-selector">
         {COMPASS_TARGETS.map((target, index) => (
@@ -528,6 +515,22 @@ export default function Home() {
       </section>
 
       {toTarget && (
+        <section className="target-selector">
+          <button
+            type="button"
+            onClick={() => {
+              setHeadingOffset(normalizeHeading(toTarget.bearing - heading));
+            }}
+          >
+            Calibrate to current target direction
+          </button>
+          <button type="button" onClick={() => setHeadingOffset(0)}>
+            Reset calibration
+          </button>
+        </section>
+      )}
+
+      {toTarget && (
         <section className="stats">
           <p>
             <strong>Compass target:</strong> {activeTarget.label}
@@ -539,7 +542,7 @@ export default function Home() {
             <strong>Bearing:</strong> {toTarget.bearing.toFixed(2)}°
           </p>
           <p>
-            <strong>Heading quality:</strong> {headingAccuracy}
+            <strong>Heading quality:</strong> {headingAccuracy} ({calibratedHeading.toFixed(1)}°)
           </p>
           <p>
             <strong>Distance:</strong> {toTarget.distance.toFixed(2)} km
@@ -550,7 +553,7 @@ export default function Home() {
           <p>
             <strong>Status:</strong> {statusMessage}
           </p>
-          {simulatedPosition && <p className="badge">Simulator active (compass disabled)</p>}
+          {simulatedPosition && <p className="badge">Simulator active (using simulated location)</p>}
           {spoofActive && <p className="badge">Secret teleport spoof active</p>}
         </section>
       )}
