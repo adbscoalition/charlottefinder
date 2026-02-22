@@ -30,6 +30,23 @@ body {
   text-align: center;
 }
 
+
+.page-rainbow-mode {
+  animation: rainbow-ui-shift 18s linear infinite;
+}
+
+.page-rainbow-mode h1,
+.page-rainbow-mode h2,
+.page-rainbow-mode p,
+.page-rainbow-mode summary,
+.page-rainbow-mode label,
+.page-rainbow-mode strong,
+.page-rainbow-mode .badge,
+.page-rainbow-mode button,
+.page-rainbow-mode input {
+  animation: rainbow-text-shift 14s linear infinite;
+}
+
 .space-particles {
   position: absolute;
   inset: 0;
@@ -436,6 +453,35 @@ button:active {
   0% { transform: translate(0, 0); opacity: 0.25; }
   50% { transform: translate(-16px, 14px); opacity: 0.95; }
   100% { transform: translate(-32px, 28px); opacity: 0.2; }
+}
+
+
+@keyframes rainbow-ui-shift {
+  0% { filter: hue-rotate(0deg) saturate(1.15); }
+  100% { filter: hue-rotate(360deg) saturate(1.15); }
+}
+
+@keyframes rainbow-text-shift {
+  0% {
+    color: #ff8ccf;
+    text-shadow: 0 0 8px rgba(255, 140, 207, 0.28);
+  }
+  25% {
+    color: #ffd86e;
+    text-shadow: 0 0 8px rgba(255, 216, 110, 0.28);
+  }
+  50% {
+    color: #7de7ff;
+    text-shadow: 0 0 8px rgba(125, 231, 255, 0.28);
+  }
+  75% {
+    color: #95ffa9;
+    text-shadow: 0 0 8px rgba(149, 255, 169, 0.28);
+  }
+  100% {
+    color: #ff8ccf;
+    text-shadow: 0 0 8px rgba(255, 140, 207, 0.28);
+  }
 }
 
 @keyframes hue-chaos {

@@ -455,6 +455,7 @@ export default function Home() {
   const ringShake = useMemo(() => shakeStrength(displayFieldStrength), [displayFieldStrength]);
   const shootingStarActive = displayFieldStrength >= 13500;
   const destabilizedState = displayFieldStrength >= 150000;
+  const rainbowUiState = displayFieldStrength >= 200000;
   const orbScale = useMemo(
     () => 1 + Math.min(displayFieldStrength / 18000, 0.2) + Math.sin(refreshTick * 1.7) * (displayFieldStrength >= 150000 ? 0.08 : 0.03),
     [displayFieldStrength, refreshTick]
@@ -527,7 +528,7 @@ export default function Home() {
 
   return (
     <main
-      className="page"
+      className={`page ${rainbowUiState ? "page-rainbow-mode" : ""}`}
       style={{
         background: dynamicBackground,
         ["--orb-accent" as string]: pulseRingColor,
