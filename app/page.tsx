@@ -9,6 +9,7 @@ type Coordinates = {
 
 type MagneticSource = {
   name: string;
+  category: "regular" | "secret";
   center: Coordinates;
   bands: Array<{
     startKm: number;
@@ -28,17 +29,22 @@ const EASTER_EGG: Coordinates = { lat: 49.2729341959022, lon: -123.0694119366999
 const CHARLOTTE_MI: Coordinates = { lat: 42.56318196348821, lon: -84.83584647437215 };
 const PACIFIC_FIELD: Coordinates = { lat: 53.255510249854304, lon: -132.08947116604432 };
 const CARIBBEAN_FIELD: Coordinates = { lat: 18.34185490966226, lon: -64.9316281681369 };
+const PORT_CHARLOTTE_FL: Coordinates = { lat: 27.010523765938274, lon: -82.14259591632731 };
+const CHARLOTTETOWN_PEI: Coordinates = { lat: 46.23722371252871, lon: -63.12970137942366 };
 
 const COMPASS_TARGETS: CompassTarget[] = [
   { label: "Charlotte, NC", center: CHARLOTTE },
   { label: "Charlotte, MI", center: CHARLOTTE_MI },
   { label: "Haida Gwaii Islands", center: PACIFIC_FIELD },
-  { label: "Charlotte Amalie, US Virgin Islands", center: CARIBBEAN_FIELD }
+  { label: "Charlotte Amalie, US Virgin Islands", center: CARIBBEAN_FIELD },
+  { label: "Port Charlotte, FL", center: PORT_CHARLOTTE_FL },
+  { label: "Charlottetown, PEI", center: CHARLOTTETOWN_PEI }
 ];
 
 const MAGNETIC_SOURCES: MagneticSource[] = [
   {
     name: "Charlotte, NC",
+    category: "regular",
     center: CHARLOTTE,
     bands: [
       { startKm: 0, endKm: 10, startValue: 1000, endValue: 1000 },
@@ -50,6 +56,7 @@ const MAGNETIC_SOURCES: MagneticSource[] = [
   },
   {
     name: "Vancouver Easter Egg",
+    category: "secret",
     center: EASTER_EGG,
     bands: [
       { startKm: 0, endKm: 0.01, startValue: 15000, endValue: 15000 },
@@ -60,6 +67,7 @@ const MAGNETIC_SOURCES: MagneticSource[] = [
   },
   {
     name: "Charlotte, MI",
+    category: "regular",
     center: CHARLOTTE_MI,
     bands: [
       { startKm: 0, endKm: 2, startValue: 575, endValue: 575 },
@@ -70,6 +78,7 @@ const MAGNETIC_SOURCES: MagneticSource[] = [
   },
   {
     name: "Pacific Field",
+    category: "regular",
     center: PACIFIC_FIELD,
     bands: [
       { startKm: 0, endKm: 200, startValue: 230, endValue: 230 },
@@ -79,12 +88,35 @@ const MAGNETIC_SOURCES: MagneticSource[] = [
   },
   {
     name: "Caribbean Field",
+    category: "regular",
     center: CARIBBEAN_FIELD,
     bands: [
       { startKm: 0, endKm: 1, startValue: 300, endValue: 300 },
       { startKm: 1, endKm: 10, startValue: 300, endValue: 100 },
       { startKm: 10, endKm: 25, startValue: 100, endValue: 20 },
       { startKm: 25, endKm: 40, startValue: 20, endValue: 0 }
+    ]
+  },
+  {
+    name: "Port Charlotte, FL",
+    category: "regular",
+    center: PORT_CHARLOTTE_FL,
+    bands: [
+      { startKm: 0, endKm: 3, startValue: 400, endValue: 400 },
+      { startKm: 3, endKm: 10, startValue: 400, endValue: 100 },
+      { startKm: 10, endKm: 30, startValue: 100, endValue: 12 },
+      { startKm: 30, endKm: 100, startValue: 12, endValue: 0 }
+    ]
+  },
+  {
+    name: "Charlottetown, PEI",
+    category: "regular",
+    center: CHARLOTTETOWN_PEI,
+    bands: [
+      { startKm: 0, endKm: 2, startValue: 350, endValue: 350 },
+      { startKm: 2, endKm: 8, startValue: 350, endValue: 100 },
+      { startKm: 8, endKm: 24, startValue: 100, endValue: 25 },
+      { startKm: 24, endKm: 128, startValue: 25, endValue: 0 }
     ]
   }
 ];
@@ -208,15 +240,23 @@ function colorFromStops(value: number, stops: Array<{ value: number; color: stri
   return mixRgb(hexToRgb(lowerStop.color), hexToRgb(upperStop.color), t);
 }
 
-function fieldMessage(value: number) {
+function regularFieldMessage(value: number) {
   if (value <= 0) return "You're not near any Charlotte.";
-  if (value < 100) return "You feel a slight force of Charlotte...";
-  if (value < 199) return "The force is getting stronger...";
-  if (value < 500) return "You enter the sphere of influence.";
-  if (value < 1000) return "CHARLOTTE!!!! YAY!!!!!";
-  if (value < 3000) return "Why is there a stronger Charlotte nearby...?";
-  if (value < 14000) return "The Force is IMMENSE...!";
-  return "YOU FEEL A STRONG CHARLOTTE LOCATION!!!!!!!!!";
+  if (value < 20) return "You feel a presence of Charlotte...";
+  if (value < 50) return "You are nearing a Charlotte...";
+  if (value < 200) return "You are near a Charlotte!";
+  if (value < 800) return "You are at a CHARLOTTE!!!!";
+  return "Welcome to the QUEEN CITY!!!";
+}
+
+function secretFieldMessage(value: number) {
+  if (value <= 0) return "";
+  if (value < 10) return "A magnetic field?";
+  if (value < 50) return "This shouldn't be here...";
+  if (value < 300) return "Why is it spiking??!?!";
+  if (value < 4000) return "ITS SPIKING AHH CHARLOTTE";
+  if (value < 14000) return "THE HOLY CHARLOTTE!!!!";
+  return "CHARLOTTE CHARLOTTE CHARLOTTE";
 }
 
 function backgroundFromField(value: number) {
@@ -288,16 +328,18 @@ export default function Home() {
   }, [activePosition, activeTarget]);
 
   const magneticBreakdown = useMemo(() => {
-    if (!activePosition) return [] as Array<{ name: string; value: number; distance: number }>;
+    if (!activePosition) return [] as Array<{ name: string; value: number; distance: number; category: MagneticSource["category"] }>;
 
     return MAGNETIC_SOURCES.map((source) => {
       const dist = distanceKm(activePosition, source.center);
-      return { name: source.name, value: magneticValueFromBands(dist, source.bands), distance: dist };
+      return { name: source.name, value: magneticValueFromBands(dist, source.bands), distance: dist, category: source.category };
     }).sort((a, b) => b.value - a.value);
   }, [activePosition]);
 
   const fieldStrength = useMemo(() => magneticBreakdown.reduce((sum, item) => sum + item.value, 0), [magneticBreakdown]);
-  const statusMessage = useMemo(() => fieldMessage(fieldStrength), [fieldStrength]);
+  const regularFieldStrength = useMemo(() => magneticBreakdown.filter((item) => item.category === "regular").reduce((sum, item) => sum + item.value, 0), [magneticBreakdown]);
+  const secretFieldStrength = useMemo(() => magneticBreakdown.filter((item) => item.category === "secret").reduce((sum, item) => sum + item.value, 0), [magneticBreakdown]);
+  const statusMessage = useMemo(() => (secretFieldStrength > 0 ? secretFieldMessage(secretFieldStrength) : regularFieldMessage(regularFieldStrength)), [regularFieldStrength, secretFieldStrength]);
   const dynamicBackground = useMemo(() => backgroundFromField(fieldStrength), [fieldStrength]);
   const pulsesPerSecond = useMemo(() => {
     if (fieldStrength <= 0) return 0;
@@ -446,6 +488,12 @@ export default function Home() {
             </button>
             <button type="button" onClick={() => setSimulatorPoint(CARIBBEAN_FIELD)}>
               Use Charlotte Amalie, US Virgin Islands
+            </button>
+            <button type="button" onClick={() => setSimulatorPoint(PORT_CHARLOTTE_FL)}>
+              Use Port Charlotte, FL
+            </button>
+            <button type="button" onClick={() => setSimulatorPoint(CHARLOTTETOWN_PEI)}>
+              Use Charlottetown, PEI
             </button>
           </div>
           <label>
