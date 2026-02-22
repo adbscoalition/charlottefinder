@@ -143,11 +143,31 @@ function formatField(value: number) {
 type Rgb = { r: number; g: number; b: number };
 
 const BACKGROUND_STOPS: Array<{ value: number; color: string }> = [
-  { value: 0, color: "#000000" },
-  { value: 30, color: "#3f0000" },
-  { value: 140, color: "#b91c1c" },
-  { value: 300, color: "#f97316" },
-  { value: 1000, color: "#facc15" },
+  { value: 0, color: "#020617" },
+  { value: 50, color: "#1f2937" },
+  { value: 200, color: "#334155" },
+  { value: 1001, color: "#854d0e" },
+  { value: 5000, color: "#7f1d1d" },
+  { value: 14000, color: "#312e81" },
+  { value: 15000, color: "#1d4ed8" }
+];
+
+const FIELD_NUMBER_STOPS: Array<{ value: number; color: string }> = [
+  { value: 0, color: "#9ca3af" },
+  { value: 50, color: "#d1d5db" },
+  { value: 200, color: "#ffffff" },
+  { value: 1001, color: "#facc15" },
+  { value: 14000, color: "#93c5fd" },
+  { value: 15000, color: "#2563eb" }
+];
+
+const PULSE_RING_STOPS: Array<{ value: number; color: string }> = [
+  { value: 0, color: "#9ca3af" },
+  { value: 50, color: "#ffffff" },
+  { value: 200, color: "#facc15" },
+  { value: 1001, color: "#f97316" },
+  { value: 5000, color: "#ef4444" },
+  { value: 14000, color: "#a855f7" },
   { value: 15000, color: "#2563eb" }
 ];
 
@@ -172,6 +192,22 @@ function rgbToCss(rgb: Rgb, alpha = 1) {
   return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`;
 }
 
+function colorFromStops(value: number, stops: Array<{ value: number; color: string }>) {
+  const clampedValue = Math.max(value, 0);
+
+  if (clampedValue <= stops[0].value) {
+    return hexToRgb(stops[0].color);
+  }
+
+  const upperStop = stops.find((stop) => clampedValue <= stop.value) ?? stops[stops.length - 1];
+  const upperIndex = stops.indexOf(upperStop);
+  const lowerStop = stops[Math.max(upperIndex - 1, 0)];
+  const span = Math.max(upperStop.value - lowerStop.value, 1);
+  const t = Math.min(Math.max((clampedValue - lowerStop.value) / span, 0), 1);
+
+  return mixRgb(hexToRgb(lowerStop.color), hexToRgb(upperStop.color), t);
+}
+
 function fieldMessage(value: number) {
   if (value <= 0) return "You're not near any Charlotte.";
   if (value < 100) return "You feel a slight force of Charlotte...";
@@ -184,22 +220,20 @@ function fieldMessage(value: number) {
 }
 
 function backgroundFromField(value: number) {
-  const clampedValue = Math.max(value, 0);
+  const base = colorFromStops(value, BACKGROUND_STOPS);
+  const top = mixRgb(base, { r: 255, g: 255, b: 255 }, 0.2);
+  const bottom = mixRgb(base, { r: 0, g: 0, b: 0 }, 0.55);
+  const accent = mixRgb(base, { r: 56, g: 189, b: 248 }, 0.2);
 
-  if (clampedValue <= BACKGROUND_STOPS[0].value) {
-    const base = hexToRgb(BACKGROUND_STOPS[0].color);
-    return `radial-gradient(circle at 20% 20%, ${rgbToCss(base, 0.5)} 0%, ${rgbToCss(base)} 75%)`;
-  }
+  return `linear-gradient(160deg, ${rgbToCss(top, 0.94)} 0%, ${rgbToCss(bottom, 0.98)} 100%), radial-gradient(circle at 18% 18%, ${rgbToCss(accent, 0.48)} 0%, ${rgbToCss(base, 0)} 58%)`;
+}
 
-  const upperStop = BACKGROUND_STOPS.find((stop) => clampedValue <= stop.value) ?? BACKGROUND_STOPS[BACKGROUND_STOPS.length - 1];
-  const upperIndex = BACKGROUND_STOPS.indexOf(upperStop);
-  const lowerStop = BACKGROUND_STOPS[Math.max(upperIndex - 1, 0)];
-  const span = Math.max(upperStop.value - lowerStop.value, 1);
-  const t = Math.min(Math.max((clampedValue - lowerStop.value) / span, 0), 1);
-
-  const mixed = mixRgb(hexToRgb(lowerStop.color), hexToRgb(upperStop.color), t);
-  const glow = mixRgb(mixed, { r: 255, g: 255, b: 255 }, 0.2);
-  return `radial-gradient(circle at 20% 20%, ${rgbToCss(glow, 0.55)} 0%, ${rgbToCss(mixed, 0.95)} 70%)`;
+function shakeStrength(value: number) {
+  if (value <= 0) return 0;
+  if (value < 1001) return 0.2;
+  if (value < 5000) return 0.45;
+  if (value < 14000) return 0.8;
+  return 1.25;
 }
 
 export default function Home() {
@@ -265,7 +299,14 @@ export default function Home() {
   const fieldStrength = useMemo(() => magneticBreakdown.reduce((sum, item) => sum + item.value, 0), [magneticBreakdown]);
   const statusMessage = useMemo(() => fieldMessage(fieldStrength), [fieldStrength]);
   const dynamicBackground = useMemo(() => backgroundFromField(fieldStrength), [fieldStrength]);
-  const pulsesPerSecond = useMemo(() => Math.min(fieldStrength / 1000, 8), [fieldStrength]);
+  const pulsesPerSecond = useMemo(() => {
+    if (fieldStrength <= 0) return 0;
+    return Math.min(0.8 + fieldStrength / 1100, 8);
+  }, [fieldStrength]);
+  const fieldNumberColor = useMemo(() => rgbToCss(colorFromStops(fieldStrength, FIELD_NUMBER_STOPS)), [fieldStrength]);
+  const pulseRingColor = useMemo(() => rgbToCss(colorFromStops(fieldStrength, PULSE_RING_STOPS)), [fieldStrength]);
+  const numberShake = useMemo(() => shakeStrength(fieldStrength), [fieldStrength]);
+  const ringShake = useMemo(() => shakeStrength(fieldStrength), [fieldStrength]);
 
   const submitTeleport = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -336,9 +377,18 @@ export default function Home() {
       <section className="field-core">
         <div
           className="field-pulse"
-          style={{ animationDuration: pulsesPerSecond > 0 ? `${Math.max(1 / pulsesPerSecond, 0.12)}s` : undefined }}
+          style={{
+            borderColor: pulseRingColor,
+            boxShadow: `0 0 26px ${rgbToCss(colorFromStops(fieldStrength, PULSE_RING_STOPS), 0.85)}`,
+            animationDuration: pulsesPerSecond > 0 ? `${Math.max(1 / pulsesPerSecond, 0.12)}s, 0.12s` : undefined,
+            animationPlayState: pulsesPerSecond > 0 ? "running" : "paused",
+            opacity: fieldStrength <= 0 ? 0.8 : 1,
+            ["--shake-distance" as string]: `${ringShake}px`
+          }}
         />
-        <p className="field-value">{formatField(fieldStrength)}</p>
+        <p className="field-value" style={{ color: fieldNumberColor, ["--shake-distance" as string]: `${numberShake}px` }}>
+          {formatField(fieldStrength)}
+        </p>
         <p className="field-label">CLT Magnetic Field™</p>
         <p className="field-status">{statusMessage}</p>
       </section>
