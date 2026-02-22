@@ -1,5 +1,9 @@
 :root {
   color-scheme: dark;
+  --orb-accent: #94a3b8;
+  --orb-value: #e2e8f0;
+  --orb-surface: rgba(51, 65, 85, 0.2);
+  --orb-glow: rgba(148, 163, 184, 0.45);
 }
 
 * {
@@ -37,7 +41,7 @@ h2 {
 .subtitle {
   margin-top: 0.4rem;
   margin-bottom: 1.2rem;
-  color: #cbd5e1;
+  color: color-mix(in oklab, #cbd5e1 72%, var(--orb-accent));
   font-family: var(--font-russo-one), sans-serif;
 }
 
@@ -53,9 +57,10 @@ h2 {
 .target-list {
   margin-top: 1rem;
   width: min(500px, 94vw);
-  border: 1px solid #334155;
+  border: 1px solid color-mix(in oklab, #334155 45%, var(--orb-accent));
   border-radius: 12px;
-  background: rgba(15, 23, 42, 0.7);
+  background: linear-gradient(135deg, color-mix(in oklab, rgba(15, 23, 42, 0.78) 82%, var(--orb-surface)) 0%, rgba(2, 6, 23, 0.8) 100%);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.26), inset 0 0 0 1px color-mix(in oklab, transparent 70%, var(--orb-glow));
   padding: 0.5rem 0.75rem 0.75rem;
   text-align: left;
 }
@@ -80,8 +85,8 @@ h2 {
 }
 
 .target-active {
-  border-color: #f43f5e;
-  box-shadow: 0 0 0 1px #f43f5e;
+  border-color: var(--orb-accent);
+  box-shadow: 0 0 0 1px var(--orb-accent), 0 0 18px color-mix(in oklab, transparent 55%, var(--orb-glow));
 }
 
 .field-core {
@@ -89,8 +94,8 @@ h2 {
   overflow: hidden;
   width: min(420px, 94vw);
   border-radius: 16px;
-  border: 1px solid #334155;
-  background: rgba(2, 6, 23, 0.62);
+  border: 1px solid color-mix(in oklab, #334155 55%, var(--orb-accent));
+  background: linear-gradient(145deg, color-mix(in oklab, rgba(2, 6, 23, 0.72) 82%, var(--orb-surface)) 0%, rgba(2, 6, 23, 0.9) 100%);
   box-shadow: 0 14px 36px rgba(0, 0, 0, 0.4);
   padding: 1rem;
 }
@@ -192,11 +197,12 @@ h2 {
   animation: field-jitter 0.11s ease-in-out infinite;
   --shake-distance: 0px;
   transition: color 220ms ease, text-shadow 220ms ease;
+  text-shadow: 0 0 14px color-mix(in oklab, transparent 70%, var(--orb-value));
 }
 
 .field-label {
   margin: 0.2rem 0 0.8rem;
-  color: #cbd5e1;
+  color: color-mix(in oklab, #cbd5e1 70%, var(--orb-accent));
 }
 
 .field-status {
@@ -242,8 +248,8 @@ h2 {
 
 .stats {
   margin-top: 1rem;
-  background: rgba(15, 23, 42, 0.8);
-  border: 1px solid #334155;
+  background: linear-gradient(145deg, color-mix(in oklab, rgba(15, 23, 42, 0.85) 80%, var(--orb-surface)) 0%, rgba(15, 23, 42, 0.66) 100%);
+  border: 1px solid color-mix(in oklab, #334155 45%, var(--orb-accent));
   border-radius: 14px;
   padding: 0.8rem 1rem;
   width: min(420px, 94vw);
@@ -251,7 +257,7 @@ h2 {
 }
 
 .badge {
-  color: #facc15;
+  color: color-mix(in oklab, #facc15 55%, var(--orb-accent));
   font-weight: 600;
 }
 
@@ -260,8 +266,8 @@ h2 {
   width: min(420px, 94vw);
   display: grid;
   gap: 0.5rem;
-  background: rgba(30, 41, 59, 0.9);
-  border: 1px dashed #60a5fa;
+  background: linear-gradient(145deg, color-mix(in oklab, rgba(30, 41, 59, 0.9) 80%, var(--orb-surface)) 0%, rgba(15, 23, 42, 0.82) 100%);
+  border: 1px dashed color-mix(in oklab, #60a5fa 42%, var(--orb-accent));
   border-radius: 12px;
   padding: 1rem;
   text-align: left;
@@ -293,15 +299,25 @@ h2 {
 input,
 button {
   font-family: var(--font-public-sans), Arial, sans-serif;
-  border-radius: 8px;
-  border: 1px solid #475569;
+  border-radius: 10px;
+  border: 1px solid color-mix(in oklab, #475569 58%, var(--orb-accent));
   padding: 0.6rem;
-  background: #0f172a;
+  background: linear-gradient(145deg, color-mix(in oklab, #0f172a 82%, var(--orb-surface)) 0%, #020617 100%);
   color: #e2e8f0;
+  transition: border-color 180ms ease, box-shadow 180ms ease, transform 150ms ease;
 }
 
 button {
   cursor: pointer;
+}
+
+button:hover {
+  border-color: var(--orb-accent);
+  box-shadow: 0 0 0 1px color-mix(in oklab, transparent 40%, var(--orb-accent)), 0 0 20px color-mix(in oklab, transparent 72%, var(--orb-glow));
+}
+
+button:active {
+  transform: translateY(1px) scale(0.99);
 }
 
 .error {

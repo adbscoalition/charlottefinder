@@ -349,6 +349,8 @@ export default function Home() {
   }, [fieldStrength]);
   const fieldNumberColor = useMemo(() => rgbToCss(colorFromStops(fieldStrength, FIELD_NUMBER_STOPS)), [fieldStrength]);
   const pulseRingColor = useMemo(() => rgbToCss(colorFromStops(fieldStrength, PULSE_RING_STOPS)), [fieldStrength]);
+  const uiSurfaceColor = useMemo(() => rgbToCss(colorFromStops(fieldStrength, BACKGROUND_STOPS), 0.2), [fieldStrength]);
+  const uiBorderGlow = useMemo(() => rgbToCss(colorFromStops(fieldStrength, PULSE_RING_STOPS), 0.48), [fieldStrength]);
   const numberShake = useMemo(() => shakeStrength(fieldStrength), [fieldStrength]);
   const ringShake = useMemo(() => shakeStrength(fieldStrength), [fieldStrength]);
   const isLoadingField = !hasInitialFix && !simulatedPosition && !spoofActive && !error;
@@ -403,7 +405,16 @@ export default function Home() {
   };
 
   return (
-    <main className="page" style={{ background: dynamicBackground }}>
+    <main
+      className="page"
+      style={{
+        background: dynamicBackground,
+        ["--orb-accent" as string]: pulseRingColor,
+        ["--orb-value" as string]: fieldNumberColor,
+        ["--orb-surface" as string]: uiSurfaceColor,
+        ["--orb-glow" as string]: uiBorderGlow
+      }}
+    >
       <h1
         onClick={() => {
           const next = titleTapCount + 1;
