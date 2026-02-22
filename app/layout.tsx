@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Bitcount_Grid_Double, Fira_Code, Public_Sans, Russo_One } from "next/font/google";
+import { Fira_Code, Public_Sans, Russo_One, Unbounded } from "next/font/google";
 import "./globals.css";
 
 const publicSans = Public_Sans({
@@ -7,9 +7,9 @@ const publicSans = Public_Sans({
   variable: "--font-public-sans"
 });
 
-const bitcountGridDouble = Bitcount_Grid_Double({
+const unbounded = Unbounded({
   subsets: ["latin"],
-  variable: "--font-bitcount-grid-double"
+  variable: "--font-unbounded"
 });
 
 const russoOne = Russo_One({
@@ -35,7 +35,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${publicSans.variable} ${bitcountGridDouble.variable} ${russoOne.variable} ${firaCode.variable}`}>
+      <body className={`${publicSans.variable} ${unbounded.variable} ${russoOne.variable} ${firaCode.variable}`}>
         {children}
       </body>
     </html>
