@@ -429,6 +429,8 @@ export default function Home() {
 
   const audioContextRef = useRef<AudioContext | null>(null);
   const beepAccumulatorRef = useRef(0);
+  const beepsPerSecondRef = useRef(0);
+  const beepVolumeRef = useRef(0);
 
   const activePosition = simulatedPosition ?? position;
 
@@ -630,7 +632,12 @@ export default function Home() {
   }, [animatedFieldStrength]);
 
   useEffect(() => {
-    if (!effectiveSoundEnabled || isLoadingField || beepsPerSecond <= 0 || beepVolume <= 0) {
+    beepsPerSecondRef.current = beepsPerSecond;
+    beepVolumeRef.current = beepVolume;
+  }, [beepVolume, beepsPerSecond]);
+
+  useEffect(() => {
+    if (!effectiveSoundEnabled || isLoadingField) {
       beepAccumulatorRef.current = 0;
       return;
     }
@@ -647,16 +654,15 @@ export default function Home() {
       return audioContextRef.current;
     };
 
-    const playBeep = (ctx: AudioContext) => {
+    const playBeep = (ctx: AudioContext, peakGain: number) => {
       const now = ctx.currentTime;
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      const peakGain = Math.max(0.0001, beepVolume);
 
       osc.type = "sine";
       osc.frequency.value = 920;
       gain.gain.setValueAtTime(0.0001, now);
-      gain.gain.exponentialRampToValueAtTime(peakGain, now + 0.005);
+      gain.gain.exponentialRampToValueAtTime(Math.max(0.0001, peakGain), now + 0.005);
       gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.03);
 
       osc.connect(gain);
@@ -666,19 +672,27 @@ export default function Home() {
     };
 
     const timer = window.setInterval(() => {
+      const currentBeepsPerSecond = beepsPerSecondRef.current;
+      const currentBeepVolume = beepVolumeRef.current;
+
+      if (currentBeepsPerSecond <= 0 || currentBeepVolume <= 0) {
+        beepAccumulatorRef.current = 0;
+        return;
+      }
+
       const ctx = ensureAudioContext();
-      beepAccumulatorRef.current += beepsPerSecond * (tickMs / 1000);
+      beepAccumulatorRef.current += currentBeepsPerSecond * (tickMs / 1000);
 
       let safety = 0;
       while (beepAccumulatorRef.current >= 1 && safety < 20) {
-        playBeep(ctx);
+        playBeep(ctx, currentBeepVolume);
         beepAccumulatorRef.current -= 1;
         safety += 1;
       }
     }, tickMs);
 
     return () => window.clearInterval(timer);
-  }, [beepVolume, beepsPerSecond, effectiveSoundEnabled, isLoadingField]);
+  }, [effectiveSoundEnabled, isLoadingField]);
 
   return (
     <main
