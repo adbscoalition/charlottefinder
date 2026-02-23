@@ -624,7 +624,7 @@ export default function Home() {
   };
 
   const effectiveSoundEnabled = soundEnabled && !startupPopupVisible;
-  const beepsPerSecond = Math.max(animatedFieldStrength * 0.01, 0);
+  const beepsPerSecond = Math.min(Math.max(animatedFieldStrength * 0.01, 0), 40);
   const beepVolume = useMemo(() => {
     if (animatedFieldStrength < 100) return 0;
     if (animatedFieldStrength >= 500) return 1;
