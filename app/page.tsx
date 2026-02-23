@@ -623,9 +623,14 @@ export default function Home() {
 
   const effectiveSoundEnabled = soundEnabled && !startupPopupVisible;
   const beepsPerSecond = Math.max(animatedFieldStrength * 0.01, 0);
+  const beepVolume = useMemo(() => {
+    if (animatedFieldStrength < 100) return 0;
+    if (animatedFieldStrength >= 500) return 1;
+    return 0.1 + ((animatedFieldStrength - 100) / 400) * 0.9;
+  }, [animatedFieldStrength]);
 
   useEffect(() => {
-    if (!effectiveSoundEnabled || isLoadingField || beepsPerSecond <= 0) {
+    if (!effectiveSoundEnabled || isLoadingField || beepsPerSecond <= 0 || beepVolume <= 0) {
       beepAccumulatorRef.current = 0;
       return;
     }
@@ -646,11 +651,12 @@ export default function Home() {
       const now = ctx.currentTime;
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
+      const peakGain = Math.max(0.0001, beepVolume);
 
       osc.type = "sine";
       osc.frequency.value = 920;
       gain.gain.setValueAtTime(0.0001, now);
-      gain.gain.exponentialRampToValueAtTime(0.07, now + 0.005);
+      gain.gain.exponentialRampToValueAtTime(peakGain, now + 0.005);
       gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.03);
 
       osc.connect(gain);
@@ -672,7 +678,7 @@ export default function Home() {
     }, tickMs);
 
     return () => window.clearInterval(timer);
-  }, [beepsPerSecond, effectiveSoundEnabled, isLoadingField]);
+  }, [beepVolume, beepsPerSecond, effectiveSoundEnabled, isLoadingField]);
 
   return (
     <main
