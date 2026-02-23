@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 type Coordinates = {
   lat: number;
@@ -296,12 +296,14 @@ function getPstTotalMinutes(now = new Date()) {
     timeZone: "America/Los_Angeles",
     hour12: false,
     hour: "2-digit",
-    minute: "2-digit"
+    minute: "2-digit",
+    second: "2-digit"
   }).formatToParts(now);
 
   const hour = Number(parts.find((part) => part.type === "hour")?.value ?? "0");
   const minute = Number(parts.find((part) => part.type === "minute")?.value ?? "0");
-  return hour * 60 + minute;
+  const second = Number(parts.find((part) => part.type === "second")?.value ?? "0");
+  return hour * 60 + minute + second / 60;
 }
 
 function toRangeProgress(value: number, start: number, end: number) {
@@ -318,7 +320,10 @@ function isPstMicroSecretToggleWindow(now = new Date()) {
 function microSecretScheduledMultiplier(now = new Date()) {
   const totalMinutes = getPstTotalMinutes(now);
 
-  if (totalMinutes < 10 * 60) return 0;
+  if (totalMinutes < 9 * 60 + 58) return 0;
+  if (totalMinutes < 10 * 60 + 3) {
+    return toRangeProgress(totalMinutes, 9 * 60 + 58, 10 * 60 + 3);
+  }
   if (totalMinutes < 19 * 60 + 2) return 1;
   if (totalMinutes < 19 * 60 + 7) {
     const fadeProgress = toRangeProgress(totalMinutes, 19 * 60 + 2, 19 * 60 + 7);
@@ -330,9 +335,55 @@ function microSecretScheduledMultiplier(now = new Date()) {
 function vancouverWeakeningProgress(now = new Date()) {
   const totalMinutes = getPstTotalMinutes(now);
 
-  if (totalMinutes >= 19 * 60 + 35 || totalMinutes < 9 * 60 + 15) return 1;
+  if (totalMinutes >= 19 * 60 + 35 || totalMinutes < 9 * 60 + 27) return 1;
+  if (totalMinutes < 9 * 60 + 37) {
+    return 1 - toRangeProgress(totalMinutes, 9 * 60 + 27, 9 * 60 + 37);
+  }
   if (totalMinutes < 19 * 60 + 25) return 0;
   return toRangeProgress(totalMinutes, 19 * 60 + 25, 19 * 60 + 35);
+}
+
+function useCountingValue(targetValue: number, durationMs = 900) {
+  const [animatedValue, setAnimatedValue] = useState(targetValue);
+  const currentValueRef = useRef(targetValue);
+
+  useEffect(() => {
+    const startValue = currentValueRef.current;
+    const delta = targetValue - startValue;
+
+    if (Math.abs(delta) < 0.001) {
+      currentValueRef.current = targetValue;
+      setAnimatedValue(targetValue);
+      return;
+    }
+
+    const magnitude = Math.max(Math.abs(startValue), Math.abs(targetValue));
+    const quantum = magnitude >= 1000 ? 1 : magnitude >= 100 ? 0.1 : 0.01;
+    const startTime = performance.now();
+    let frameId = 0;
+
+    const animate = (time: number) => {
+      const progress = Math.min((time - startTime) / durationMs, 1);
+      const nextValue = startValue + delta * progress;
+      const snappedValue = Math.round(nextValue / quantum) * quantum;
+
+      currentValueRef.current = snappedValue;
+      setAnimatedValue(snappedValue);
+
+      if (progress < 1) {
+        frameId = window.requestAnimationFrame(animate);
+        return;
+      }
+
+      currentValueRef.current = targetValue;
+      setAnimatedValue(targetValue);
+    };
+
+    frameId = window.requestAnimationFrame(animate);
+    return () => window.cancelAnimationFrame(frameId);
+  }, [targetValue, durationMs]);
+
+  return animatedValue;
 }
 
 function backgroundFromField(value: number) {
@@ -458,36 +509,42 @@ export default function Home() {
   const displayFieldStrength = useMemo(() => Math.max(fieldStrength * fluctuationMultiplier, 0), [fieldStrength, fluctuationMultiplier]);
   const displayRegularStrength = useMemo(() => Math.max(regularFieldStrength * fluctuationMultiplier, 0), [regularFieldStrength, fluctuationMultiplier]);
   const displaySecretStrength = useMemo(() => Math.max(secretFieldStrength * fluctuationMultiplier, 0), [secretFieldStrength, fluctuationMultiplier]);
-  const statusMessage = useMemo(() => (displaySecretStrength > 0 ? secretFieldMessage(displaySecretStrength) : regularFieldMessage(displayRegularStrength)), [displayRegularStrength, displaySecretStrength]);
-  const dynamicBackground = useMemo(() => backgroundFromField(displayFieldStrength), [displayFieldStrength]);
-  const pulsesPerSecond = useMemo(() => {
-    if (displayFieldStrength <= 0) return 0;
-    return Math.min(0.8 + displayFieldStrength / 1100, 8);
-  }, [displayFieldStrength]);
-  const fieldNumberColor = useMemo(() => rgbToCss(colorFromStops(displayFieldStrength, FIELD_NUMBER_STOPS)), [displayFieldStrength]);
-  const pulseRingColor = useMemo(() => rgbToCss(colorFromStops(displayFieldStrength, PULSE_RING_STOPS)), [displayFieldStrength]);
-  const uiSurfaceColor = useMemo(() => rgbToCss(colorFromStops(displayFieldStrength, BACKGROUND_STOPS), 0.2), [displayFieldStrength]);
-  const uiBorderGlow = useMemo(() => rgbToCss(colorFromStops(displayFieldStrength, PULSE_RING_STOPS), 0.48), [displayFieldStrength]);
-  const numberShake = useMemo(() => shakeStrength(displayFieldStrength), [displayFieldStrength]);
-  const ringShake = useMemo(() => shakeStrength(displayFieldStrength), [displayFieldStrength]);
-  const shootingStarActive = displayFieldStrength >= 13500;
-  const destabilizedState = displayFieldStrength >= 150000;
-  const rainbowUiState = displayFieldStrength >= 200000;
-  const rainbowTransitionProgress = useMemo(() => {
-    if (displayFieldStrength <= 15000) return 0;
-    if (displayFieldStrength >= 200000) return 1;
-    return (displayFieldStrength - 15000) / (200000 - 15000);
-  }, [displayFieldStrength]);
-  const orbScale = useMemo(
-    () => 1 + Math.min(displayFieldStrength / 18000, 0.2) + Math.sin(refreshTick * 1.7) * (displayFieldStrength >= 150000 ? 0.08 : 0.03),
-    [displayFieldStrength, refreshTick]
+  const animatedFieldStrength = useCountingValue(displayFieldStrength);
+  const animatedRegularStrength = useCountingValue(displayRegularStrength);
+  const animatedSecretStrength = useCountingValue(displaySecretStrength);
+  const statusMessage = useMemo(
+    () => (animatedSecretStrength > 0 ? secretFieldMessage(animatedSecretStrength) : regularFieldMessage(animatedRegularStrength)),
+    [animatedRegularStrength, animatedSecretStrength]
   );
-  const backdropDriftSeconds = useMemo(() => Math.max(16 - Math.min(displayFieldStrength / 1100, 11), 4), [displayFieldStrength]);
+  const dynamicBackground = useMemo(() => backgroundFromField(animatedFieldStrength), [animatedFieldStrength]);
+  const pulsesPerSecond = useMemo(() => {
+    if (animatedFieldStrength <= 0) return 0;
+    return Math.min(0.8 + animatedFieldStrength / 1100, 8);
+  }, [animatedFieldStrength]);
+  const fieldNumberColor = useMemo(() => rgbToCss(colorFromStops(animatedFieldStrength, FIELD_NUMBER_STOPS)), [animatedFieldStrength]);
+  const pulseRingColor = useMemo(() => rgbToCss(colorFromStops(animatedFieldStrength, PULSE_RING_STOPS)), [animatedFieldStrength]);
+  const uiSurfaceColor = useMemo(() => rgbToCss(colorFromStops(animatedFieldStrength, BACKGROUND_STOPS), 0.2), [animatedFieldStrength]);
+  const uiBorderGlow = useMemo(() => rgbToCss(colorFromStops(animatedFieldStrength, PULSE_RING_STOPS), 0.48), [animatedFieldStrength]);
+  const numberShake = useMemo(() => shakeStrength(animatedFieldStrength), [animatedFieldStrength]);
+  const ringShake = useMemo(() => shakeStrength(animatedFieldStrength), [animatedFieldStrength]);
+  const shootingStarActive = animatedFieldStrength >= 13500;
+  const destabilizedState = animatedFieldStrength >= 150000;
+  const rainbowUiState = animatedFieldStrength >= 200000;
+  const rainbowTransitionProgress = useMemo(() => {
+    if (animatedFieldStrength <= 15000) return 0;
+    if (animatedFieldStrength >= 200000) return 1;
+    return (animatedFieldStrength - 15000) / (200000 - 15000);
+  }, [animatedFieldStrength]);
+  const orbScale = useMemo(
+    () => 1 + Math.min(animatedFieldStrength / 18000, 0.2) + Math.sin(refreshTick * 1.7) * (animatedFieldStrength >= 150000 ? 0.08 : 0.03),
+    [animatedFieldStrength, refreshTick]
+  );
+  const backdropDriftSeconds = useMemo(() => Math.max(16 - Math.min(animatedFieldStrength / 1100, 11), 4), [animatedFieldStrength]);
   const isLoadingField = !hasInitialFix && !simulatedPosition && !spoofActive && !error;
 
   useEffect(() => {
-    document.title = `${isLoadingField ? "..." : formatField(displayFieldStrength)} CLT Magnetic Field`;
-  }, [displayFieldStrength, isLoadingField]);
+    document.title = `${isLoadingField ? "..." : formatField(animatedFieldStrength)} CLT Magnetic Field`;
+  }, [animatedFieldStrength, isLoadingField]);
 
   const submitTeleport = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -598,13 +655,13 @@ export default function Home() {
           className={`field-orb ${shootingStarActive ? "field-orb-stars" : ""} ${destabilizedState ? "field-orb-destabilized" : ""}`}
           style={{
             ["--ring-color" as string]: pulseRingColor,
-            ["--ring-glow" as string]: rgbToCss(colorFromStops(displayFieldStrength, PULSE_RING_STOPS), 0.85),
+            ["--ring-glow" as string]: rgbToCss(colorFromStops(animatedFieldStrength, PULSE_RING_STOPS), 0.85),
             ["--shake-distance" as string]: `${destabilizedState ? Math.max(ringShake, 2.6) : ringShake}px`,
             ["--pulse-speed" as string]: pulsesPerSecond > 0 ? `${Math.max(1 / pulsesPerSecond, 0.12)}s` : "1.2s",
-            ["--meter-speed" as string]: `${Math.max(0.25, 0.8 - Math.min(displayFieldStrength / 20000, 0.5))}s`,
+            ["--meter-speed" as string]: `${Math.max(0.25, 0.8 - Math.min(animatedFieldStrength / 20000, 0.5))}s`,
             transform: `scale(${orbScale})`,
             animationPlayState: pulsesPerSecond > 0 || isLoadingField ? "running" : "paused",
-            opacity: displayFieldStrength <= 0 ? 0.8 : 1
+            opacity: animatedFieldStrength <= 0 ? 0.8 : 1
           }}
         >
           <span className="field-ring field-ring-a" />
@@ -624,7 +681,7 @@ export default function Home() {
           className={`field-value ${destabilizedState ? "field-value-rainbow" : ""}`}
           style={{ color: fieldNumberColor, ["--shake-distance" as string]: `${destabilizedState ? Math.max(numberShake, 2.2) : numberShake}px` }}
         >
-          {isLoadingField ? "..." : formatField(displayFieldStrength)}
+          {isLoadingField ? "..." : formatField(animatedFieldStrength)}
         </p>
         <p className="field-label">CLT Magnetic Field™</p>
         <p className="field-status">{isLoadingField ? "Calibrating magnetic sensors..." : statusMessage}</p>
