@@ -281,7 +281,7 @@ function regularFieldMessage(value: number) {
 }
 
 function secretFieldMessage(value: number) {
-  if (value >= 275000) return "THE GOD OF ALL CHARLOTTES!!!!!!";
+  if (value >= 200000) return "THE GOD OF ALL CHARLOTTES!!!!!!";
   if (value <= 0) return "";
   if (value < 10) return "A magnetic field?";
   if (value < 50) return "This shouldn't be here...";
@@ -456,6 +456,11 @@ export default function Home() {
   const shootingStarActive = displayFieldStrength >= 13500;
   const destabilizedState = displayFieldStrength >= 150000;
   const rainbowUiState = displayFieldStrength >= 200000;
+  const rainbowTransitionProgress = useMemo(() => {
+    if (displayFieldStrength <= 15000) return 0;
+    if (displayFieldStrength >= 200000) return 1;
+    return (displayFieldStrength - 15000) / (200000 - 15000);
+  }, [displayFieldStrength]);
   const orbScale = useMemo(
     () => 1 + Math.min(displayFieldStrength / 18000, 0.2) + Math.sin(refreshTick * 1.7) * (displayFieldStrength >= 150000 ? 0.08 : 0.03),
     [displayFieldStrength, refreshTick]
@@ -540,7 +545,8 @@ export default function Home() {
         ["--orb-value" as string]: fieldNumberColor,
         ["--orb-surface" as string]: uiSurfaceColor,
         ["--orb-glow" as string]: uiBorderGlow,
-        ["--drift-speed" as string]: `${backdropDriftSeconds}s`
+        ["--drift-speed" as string]: `${backdropDriftSeconds}s`,
+        ["--rainbow-transition" as string]: rainbowTransitionProgress.toString()
       }}
     >
       <div className="space-particles" aria-hidden>

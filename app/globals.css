@@ -28,6 +28,27 @@ body {
   justify-content: center;
   padding: 2rem 1rem;
   text-align: center;
+  --rainbow-transition: 0;
+}
+
+.page::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: clamp(0, var(--rainbow-transition), 1);
+  background:
+    radial-gradient(circle at 15% 15%, rgba(147, 197, 253, 0.35) 0%, rgba(147, 197, 253, 0) 48%),
+    linear-gradient(
+      125deg,
+      rgba(59, 130, 246, 0.22) 0%,
+      rgba(139, 92, 246, 0.2) 24%,
+      rgba(236, 72, 153, 0.2) 48%,
+      rgba(251, 191, 36, 0.2) 72%,
+      rgba(34, 197, 94, 0.2) 100%
+    );
+  transition: opacity 800ms ease;
 }
 
 
