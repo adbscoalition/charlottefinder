@@ -423,6 +423,12 @@ export default function Home() {
   const [simulatorPasswordInput, setSimulatorPasswordInput] = useState("");
   const [simulatorUnlocked, setSimulatorUnlocked] = useState(false);
   const [microSecretOfftimeEnabled, setMicroSecretOfftimeEnabled] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [startupPopupVisible, setStartupPopupVisible] = useState(true);
+  const [startupSoundToggle, setStartupSoundToggle] = useState(false);
+
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const beepAccumulatorRef = useRef(0);
 
   const activePosition = simulatedPosition ?? position;
 
@@ -610,6 +616,64 @@ export default function Home() {
     setError("Incorrect Location Simulator password.");
   };
 
+  const closeStartupPopup = () => {
+    setSoundEnabled(startupSoundToggle);
+    setStartupPopupVisible(false);
+  };
+
+  const effectiveSoundEnabled = soundEnabled && !startupPopupVisible;
+  const beepsPerSecond = Math.max(animatedFieldStrength * 0.01, 0);
+
+  useEffect(() => {
+    if (!effectiveSoundEnabled || isLoadingField || beepsPerSecond <= 0) {
+      beepAccumulatorRef.current = 0;
+      return;
+    }
+
+    const tickMs = 50;
+
+    const ensureAudioContext = () => {
+      if (!audioContextRef.current) {
+        audioContextRef.current = new window.AudioContext();
+      }
+      if (audioContextRef.current.state === "suspended") {
+        void audioContextRef.current.resume();
+      }
+      return audioContextRef.current;
+    };
+
+    const playBeep = (ctx: AudioContext) => {
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = "sine";
+      osc.frequency.value = 920;
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(0.07, now + 0.005);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.03);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.032);
+    };
+
+    const timer = window.setInterval(() => {
+      const ctx = ensureAudioContext();
+      beepAccumulatorRef.current += beepsPerSecond * (tickMs / 1000);
+
+      let safety = 0;
+      while (beepAccumulatorRef.current >= 1 && safety < 20) {
+        playBeep(ctx);
+        beepAccumulatorRef.current -= 1;
+        safety += 1;
+      }
+    }, tickMs);
+
+    return () => window.clearInterval(timer);
+  }, [beepsPerSecond, effectiveSoundEnabled, isLoadingField]);
+
   return (
     <main
       className={`page ${rainbowUiState ? "page-rainbow-mode" : ""}`}
@@ -648,6 +712,37 @@ export default function Home() {
       </h1>
       <p className="subtitle">Detect when you are near a Charlotte.</p>
 
+      <label className="sound-toggle">
+        <input
+          type="checkbox"
+          checked={soundEnabled}
+          onChange={(event) => setSoundEnabled(event.target.checked)}
+        />
+        Sounds {soundEnabled ? "On" : "Off"}
+      </label>
+
+      {startupPopupVisible && (
+        <div className="starter-popup-backdrop" role="dialog" aria-modal="true" aria-labelledby="starter-popup-title">
+          <div className="starter-popup">
+            <button type="button" className="popup-close" onClick={closeStartupPopup} aria-label="Close intro popup">
+              ×
+            </button>
+            <h2 id="starter-popup-title">Charlotte Magnetic Field</h2>
+            <p>Welcome! This detector estimates your current Charlotte magnetic field and adjusts visuals, particles, and pulse behavior live.</p>
+            <label className="sound-toggle">
+              <input
+                type="checkbox"
+                checked={startupSoundToggle}
+                onChange={(event) => setStartupSoundToggle(event.target.checked)}
+              />
+              Enable sounds after this popup
+            </label>
+            <button type="button" onClick={closeStartupPopup}>
+              OK
+            </button>
+          </div>
+        </div>
+      )}
 
       <section className={`field-core ${isLoadingField ? "is-loading" : ""}`}>
         <div className="field-particles" />

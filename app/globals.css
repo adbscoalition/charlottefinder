@@ -111,6 +111,53 @@ h2 {
   font-family: var(--font-russo-one), sans-serif;
 }
 
+.sound-toggle {
+  margin-bottom: 0.9rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-weight: 700;
+}
+
+.sound-toggle input {
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
+.starter-popup-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  background: rgba(2, 6, 23, 0.68);
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+}
+
+.starter-popup {
+  position: relative;
+  width: min(480px, 96vw);
+  text-align: left;
+  border-radius: 14px;
+  border: 1px solid color-mix(in oklab, #60a5fa 42%, var(--orb-accent));
+  background: linear-gradient(145deg, color-mix(in oklab, rgba(15, 23, 42, 0.95) 82%, var(--orb-surface)) 0%, rgba(2, 6, 23, 0.94) 100%);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45);
+  padding: 1rem;
+  display: grid;
+  gap: 0.7rem;
+}
+
+.popup-close {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border-radius: 999px;
+  line-height: 1;
+}
+
 .sim-toggle {
   margin-bottom: 1rem;
 }
