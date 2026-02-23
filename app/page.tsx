@@ -291,7 +291,7 @@ function secretFieldMessage(value: number) {
   return "CHARLOTTE CHARLOTTE CHARLOTTE";
 }
 
-function isPstMicroSecretActive(now = new Date()) {
+function getPstTotalMinutes(now = new Date()) {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: "America/Los_Angeles",
     hour12: false,
@@ -301,36 +301,38 @@ function isPstMicroSecretActive(now = new Date()) {
 
   const hour = Number(parts.find((part) => part.type === "hour")?.value ?? "0");
   const minute = Number(parts.find((part) => part.type === "minute")?.value ?? "0");
-  const totalMinutes = hour * 60 + minute;
-  return totalMinutes >= 10 * 60 && totalMinutes < 19 * 60;
+  return hour * 60 + minute;
+}
+
+function toRangeProgress(value: number, start: number, end: number) {
+  if (value <= start) return 0;
+  if (value >= end) return 1;
+  return (value - start) / (end - start);
 }
 
 function isPstMicroSecretToggleWindow(now = new Date()) {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Los_Angeles",
-    hour12: false,
-    hour: "2-digit",
-    minute: "2-digit"
-  }).formatToParts(now);
-
-  const hour = Number(parts.find((part) => part.type === "hour")?.value ?? "0");
-  const minute = Number(parts.find((part) => part.type === "minute")?.value ?? "0");
-  const totalMinutes = hour * 60 + minute;
+  const totalMinutes = getPstTotalMinutes(now);
   return totalMinutes >= 19 * 60 || totalMinutes < 10 * 60;
 }
 
-function isPstVancouverFieldWeakened(now = new Date()) {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Los_Angeles",
-    hour12: false,
-    hour: "2-digit",
-    minute: "2-digit"
-  }).formatToParts(now);
+function microSecretScheduledMultiplier(now = new Date()) {
+  const totalMinutes = getPstTotalMinutes(now);
 
-  const hour = Number(parts.find((part) => part.type === "hour")?.value ?? "0");
-  const minute = Number(parts.find((part) => part.type === "minute")?.value ?? "0");
-  const totalMinutes = hour * 60 + minute;
-  return totalMinutes >= 19 * 60 + 30 || totalMinutes < 9 * 60 + 15;
+  if (totalMinutes < 10 * 60) return 0;
+  if (totalMinutes < 19 * 60 + 2) return 1;
+  if (totalMinutes < 19 * 60 + 7) {
+    const fadeProgress = toRangeProgress(totalMinutes, 19 * 60 + 2, 19 * 60 + 7);
+    return 1 - fadeProgress;
+  }
+  return 0;
+}
+
+function vancouverWeakeningProgress(now = new Date()) {
+  const totalMinutes = getPstTotalMinutes(now);
+
+  if (totalMinutes >= 19 * 60 + 35 || totalMinutes < 9 * 60 + 15) return 1;
+  if (totalMinutes < 19 * 60 + 25) return 0;
+  return toRangeProgress(totalMinutes, 19 * 60 + 25, 19 * 60 + 35);
 }
 
 function backgroundFromField(value: number) {
@@ -420,19 +422,34 @@ export default function Home() {
   const magneticBreakdown = useMemo(() => {
     if (!activePosition) return [] as Array<{ name: string; value: number; distance: number; category: MagneticSource["category"] }>;
 
-    const microSecretActive = isPstMicroSecretActive() || (isPstMicroSecretToggleWindow() && microSecretOfftimeEnabled);
-    const vancouverWeakened = isPstVancouverFieldWeakened();
+    const now = new Date();
+    const microSecretMultiplier = microSecretScheduledMultiplier(now);
+    const microSecretActive = microSecretMultiplier > 0 || (isPstMicroSecretToggleWindow(now) && microSecretOfftimeEnabled);
+    const vancouverWeakening = vancouverWeakeningProgress(now);
 
     return MAGNETIC_SOURCES.map((source) => {
-      if (source.name === "Vancouver Micro Secret" && !microSecretActive) {
-        return { name: source.name, value: 0, distance: Number.POSITIVE_INFINITY, category: source.category };
+      const dist = distanceKm(activePosition, source.center);
+
+      if (source.name === "Vancouver Micro Secret") {
+        if (!microSecretActive) {
+          return { name: source.name, value: 0, distance: Number.POSITIVE_INFINITY, category: source.category };
+        }
+
+        const baseValue = magneticValueFromBands(dist, source.bands);
+        const value = isPstMicroSecretToggleWindow(now) && microSecretOfftimeEnabled ? baseValue : baseValue * microSecretMultiplier;
+        return { name: source.name, value, distance: dist, category: source.category };
       }
 
-      const dist = distanceKm(activePosition, source.center);
-      const bands = source.name === "Vancouver Easter Egg" && vancouverWeakened ? VANCOUVER_WEAKENED_BANDS : source.bands;
-      return { name: source.name, value: magneticValueFromBands(dist, bands), distance: dist, category: source.category };
+      if (source.name === "Vancouver Easter Egg") {
+        const regularValue = magneticValueFromBands(dist, source.bands);
+        const weakenedValue = magneticValueFromBands(dist, VANCOUVER_WEAKENED_BANDS);
+        const value = lerp(regularValue, weakenedValue, vancouverWeakening);
+        return { name: source.name, value, distance: dist, category: source.category };
+      }
+
+      return { name: source.name, value: magneticValueFromBands(dist, source.bands), distance: dist, category: source.category };
     }).sort((a, b) => b.value - a.value);
-  }, [activePosition, microSecretOfftimeEnabled]);
+  }, [activePosition, microSecretOfftimeEnabled, refreshTick]);
 
   const fieldStrength = useMemo(() => magneticBreakdown.reduce((sum, item) => sum + item.value, 0), [magneticBreakdown]);
   const regularFieldStrength = useMemo(() => magneticBreakdown.filter((item) => item.category === "regular").reduce((sum, item) => sum + item.value, 0), [magneticBreakdown]);
