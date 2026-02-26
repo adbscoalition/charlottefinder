@@ -32,6 +32,8 @@ const CARIBBEAN_FIELD: Coordinates = { lat: 18.34185490966226, lon: -64.93162816
 const PORT_CHARLOTTE_FL: Coordinates = { lat: 27.010523765938274, lon: -82.14259591632731 };
 const CHARLOTTETOWN_PEI: Coordinates = { lat: 46.23722371252871, lon: -63.12970137942366 };
 const VANCOUVER_MICRO_SECRET: Coordinates = { lat: 49.27295878743672, lon: -123.06939862529713 };
+const CHARLOTTESVILLE_VA: Coordinates = { lat: 38.0292848205594, lon: -78.47616344837674 };
+const QUEEN_CHARLOTTE_BURIAL_PLACE: Coordinates = { lat: 51.4836838439432, lon: -0.60668429494321 };
 
 const COMPASS_TARGETS: CompassTarget[] = [
   { label: "Charlotte, NC", center: CHARLOTTE },
@@ -39,7 +41,9 @@ const COMPASS_TARGETS: CompassTarget[] = [
   { label: "Haida Gwaii Islands", center: PACIFIC_FIELD },
   { label: "Charlotte Amalie, US Virgin Islands", center: CARIBBEAN_FIELD },
   { label: "Port Charlotte, FL", center: PORT_CHARLOTTE_FL },
-  { label: "Charlottetown, PEI", center: CHARLOTTETOWN_PEI }
+  { label: "Charlottetown, PEI", center: CHARLOTTETOWN_PEI },
+  { label: "Charlottesville, VA", center: CHARLOTTESVILLE_VA },
+  { label: "Queen Charlotte Burial Place", center: QUEEN_CHARLOTTE_BURIAL_PLACE }
 ];
 
 const MAGNETIC_SOURCES: MagneticSource[] = [
@@ -118,6 +122,31 @@ const MAGNETIC_SOURCES: MagneticSource[] = [
       { startKm: 2, endKm: 8, startValue: 350, endValue: 100 },
       { startKm: 8, endKm: 24, startValue: 100, endValue: 25 },
       { startKm: 24, endKm: 128, startValue: 25, endValue: 0 }
+    ]
+  },
+
+  {
+    name: "Charlottesville, VA",
+    category: "regular",
+    center: CHARLOTTESVILLE_VA,
+    bands: [
+      { startKm: 0, endKm: 3, startValue: 450, endValue: 450 },
+      { startKm: 3, endKm: 30, startValue: 450, endValue: 200 },
+      { startKm: 30, endKm: 120, startValue: 200, endValue: 20 },
+      { startKm: 120, endKm: 360, startValue: 20, endValue: 0 }
+    ]
+  },
+  {
+    name: "Queen Charlotte Burial Place",
+    category: "secret",
+    center: QUEEN_CHARLOTTE_BURIAL_PLACE,
+    bands: [
+      { startKm: 0, endKm: 0.1, startValue: 14000, endValue: 14000 },
+      { startKm: 0.1, endKm: 1, startValue: 14000, endValue: 3000 },
+      { startKm: 1, endKm: 3, startValue: 3000, endValue: 900 },
+      { startKm: 3, endKm: 14, startValue: 900, endValue: 200 },
+      { startKm: 14, endKm: 50, startValue: 200, endValue: 40 },
+      { startKm: 50, endKm: 250, startValue: 40, endValue: 0 }
     ]
   },
   {
@@ -281,7 +310,7 @@ function regularFieldMessage(value: number) {
 }
 
 function secretFieldMessage(value: number) {
-  if (value >= 200000) return "THE GOD OF ALL CHARLOTTES!!!!!!";
+  if (value >= 200000) return "THE MODERN SACREDS OF CHARLOTTES";
   if (value <= 0) return "";
   if (value < 10) return "A magnetic field?";
   if (value < 50) return "This shouldn't be here...";
@@ -289,6 +318,18 @@ function secretFieldMessage(value: number) {
   if (value < 4000) return "ITS SPIKING AHH CHARLOTTE";
   if (value < 14000) return "THE HOLY CHARLOTTE!!!!";
   return "CHARLOTTE CHARLOTTE CHARLOTTE";
+}
+
+
+function queenCharlotteFieldMessage(value: number) {
+  if (value <= 0) return "";
+  if (value < 40) return "Charlotte..?";
+  if (value < 200) return "The 1780 queen…";
+  if (value < 900) return "Queen Charlotte…?";
+  if (value < 11000) return "QUEEN CHARLOTTE!!!!!!";
+  if (value < 12200) return "CHARLOTTE OF MECKLENBURG-STRELITZ";
+  if (value < 13300) return "Fun Fact: in 1780 her CLT Magnetic was 1.5 MILLION!!!!!!!";
+  return "THE TRUE. GOD. OF. ALL. CHARLOTTES!";
 }
 
 function getPstTotalMinutes(now = new Date()) {
@@ -517,13 +558,23 @@ export default function Home() {
   const displayFieldStrength = useMemo(() => Math.max(fieldStrength * fluctuationMultiplier, 0), [fieldStrength, fluctuationMultiplier]);
   const displayRegularStrength = useMemo(() => Math.max(regularFieldStrength * fluctuationMultiplier, 0), [regularFieldStrength, fluctuationMultiplier]);
   const displaySecretStrength = useMemo(() => Math.max(secretFieldStrength * fluctuationMultiplier, 0), [secretFieldStrength, fluctuationMultiplier]);
+  const queenCharlotteStrength = useMemo(
+    () => magneticBreakdown.find((item) => item.name === "Queen Charlotte Burial Place")?.value ?? 0,
+    [magneticBreakdown]
+  );
+  const displayQueenCharlotteStrength = useMemo(
+    () => Math.max(queenCharlotteStrength * fluctuationMultiplier, 0),
+    [queenCharlotteStrength, fluctuationMultiplier]
+  );
   const animatedFieldStrength = useCountingValue(displayFieldStrength);
   const animatedRegularStrength = useCountingValue(displayRegularStrength);
   const animatedSecretStrength = useCountingValue(displaySecretStrength);
-  const statusMessage = useMemo(
-    () => (animatedSecretStrength > 0 ? secretFieldMessage(animatedSecretStrength) : regularFieldMessage(animatedRegularStrength)),
-    [animatedRegularStrength, animatedSecretStrength]
-  );
+  const animatedQueenCharlotteStrength = useCountingValue(displayQueenCharlotteStrength);
+  const statusMessage = useMemo(() => {
+    if (animatedQueenCharlotteStrength > 0) return queenCharlotteFieldMessage(animatedQueenCharlotteStrength);
+    if (animatedSecretStrength > 0) return secretFieldMessage(animatedSecretStrength);
+    return regularFieldMessage(animatedRegularStrength);
+  }, [animatedQueenCharlotteStrength, animatedRegularStrength, animatedSecretStrength]);
   const dynamicBackground = useMemo(() => backgroundFromField(animatedFieldStrength), [animatedFieldStrength]);
   const pulsesPerSecond = useMemo(() => {
     if (animatedFieldStrength <= 0) return 0;
@@ -889,6 +940,12 @@ export default function Home() {
             </button>
             <button type="button" onClick={() => setSimulatorPoint(CHARLOTTETOWN_PEI)}>
               Use Charlottetown, PEI
+            </button>
+            <button type="button" onClick={() => setSimulatorPoint(CHARLOTTESVILLE_VA)}>
+              Use Charlottesville, VA
+            </button>
+            <button type="button" onClick={() => setSimulatorPoint(QUEEN_CHARLOTTE_BURIAL_PLACE)}>
+              Use Queen Charlotte Burial Place
             </button>
           </div>}
           {simulatorUnlocked && <label>
