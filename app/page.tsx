@@ -348,9 +348,9 @@ function queenCharlotteFieldMessage(value: number) {
   return "THE TRUE. GOD. OF. ALL. CHARLOTTES!";
 }
 
-function getPstTotalMinutes(now = new Date()) {
+function getTimeZoneTotalMinutes(timeZone: string, now = new Date()) {
   const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Los_Angeles",
+    timeZone,
     hour12: false,
     hour: "2-digit",
     minute: "2-digit",
@@ -369,13 +369,13 @@ function toRangeProgress(value: number, start: number, end: number) {
   return (value - start) / (end - start);
 }
 
-function isPstMicroSecretToggleWindow(now = new Date()) {
-  const totalMinutes = getPstTotalMinutes(now);
+function isMicroSecretToggleWindow(timeZone: string, now = new Date()) {
+  const totalMinutes = getTimeZoneTotalMinutes(timeZone, now);
   return totalMinutes >= 19 * 60 || totalMinutes < 10 * 60;
 }
 
-function microSecretScheduledMultiplier(now = new Date()) {
-  const totalMinutes = getPstTotalMinutes(now);
+function microSecretScheduledMultiplier(timeZone: string, now = new Date()) {
+  const totalMinutes = getTimeZoneTotalMinutes(timeZone, now);
 
   if (totalMinutes < 9 * 60 + 58) return 0;
   if (totalMinutes < 10 * 60 + 3) {
@@ -389,8 +389,8 @@ function microSecretScheduledMultiplier(now = new Date()) {
   return 0;
 }
 
-function vancouverWeakeningProgress(now = new Date()) {
-  const totalMinutes = getPstTotalMinutes(now);
+function vancouverWeakeningProgress(timeZone: string, now = new Date()) {
+  const totalMinutes = getTimeZoneTotalMinutes(timeZone, now);
 
   if (totalMinutes >= 19 * 60 + 35 || totalMinutes < 9 * 60 + 27) return 1;
   if (totalMinutes < 9 * 60 + 37) {
@@ -483,7 +483,7 @@ function timeWindowMultiplier(nowMinutes: number, startTime: string, endTime: st
   return 0;
 }
 
-function uploadedFieldValue(distanceKm: number, field: UploadedSecretField, now = new Date()) {
+function uploadedFieldValue(distanceKm: number, field: UploadedSecretField, timeZone: string, now = new Date()) {
   const yKm = field.maxRangeMeters / 1000;
   const x = field.maxIntensity;
 
@@ -505,8 +505,20 @@ function uploadedFieldValue(distanceKm: number, field: UploadedSecretField, now 
   }
 
   if (!field.startTime || !field.endTime) return value;
-  const fade = timeWindowMultiplier(getPstTotalMinutes(now), field.startTime, field.endTime);
+  const fade = timeWindowMultiplier(getTimeZoneTotalMinutes(timeZone, now), field.startTime, field.endTime);
   return value * fade;
+}
+
+
+function coordinateKey(coords: Coordinates) {
+  return `${coords.lat.toFixed(6)},${coords.lon.toFixed(6)}`;
+}
+
+async function lookupTimeZone(coords: Coordinates) {
+  const response = await fetch(`https://timeapi.io/api/TimeZone/coordinate?latitude=${coords.lat}&longitude=${coords.lon}`);
+  if (!response.ok) throw new Error(`Time zone lookup failed: ${response.status}`);
+  const payload = (await response.json()) as { timeZone?: string };
+  return payload.timeZone ?? null;
 }
 
 function backgroundFromField(value: number) {
@@ -557,6 +569,7 @@ export default function Home() {
   const [fieldLatInput, setFieldLatInput] = useState("");
   const [fieldLonInput, setFieldLonInput] = useState("");
   const [soundEnabled, setSoundEnabled] = useState(false);
+  const [timeZoneByCoordinate, setTimeZoneByCoordinate] = useState<Record<string, string>>({});
 
   const audioContextRef = useRef<AudioContext | null>(null);
   const beepAccumulatorRef = useRef(0);
@@ -626,6 +639,40 @@ export default function Home() {
     window.localStorage.setItem(CUSTOM_FIELD_STORAGE_KEY, JSON.stringify(uploadedFields));
   }, [uploadedFields]);
 
+  useEffect(() => {
+    const staticTimeZoneCoordinates = [EASTER_EGG, VANCOUVER_MICRO_SECRET];
+    const uploadedCoordinates = uploadedFields
+      .filter((field) => field.startTime && field.endTime)
+      .map((field) => field.center);
+
+    const pending = [...staticTimeZoneCoordinates, ...uploadedCoordinates].filter((coords) => !timeZoneByCoordinate[coordinateKey(coords)]);
+    if (pending.length === 0) return;
+
+    let disposed = false;
+
+    const resolveMissingTimeZones = async () => {
+      for (const coords of pending) {
+        const key = coordinateKey(coords);
+        if (timeZoneByCoordinate[key]) continue;
+
+        try {
+          const timeZone = await lookupTimeZone(coords);
+          if (!timeZone || disposed) continue;
+
+          setTimeZoneByCoordinate((prev) => (prev[key] ? prev : { ...prev, [key]: timeZone }));
+        } catch {
+          // fallback: keep existing source defaults if lookup fails
+        }
+      }
+    };
+
+    void resolveMissingTimeZones();
+
+    return () => {
+      disposed = true;
+    };
+  }, [timeZoneByCoordinate, uploadedFields]);
+
   const activeTarget = COMPASS_TARGETS[activeTargetIndex] ?? COMPASS_TARGETS[0];
 
   const toTarget = useMemo(() => {
@@ -639,9 +686,10 @@ export default function Home() {
     if (!activePosition) return [] as Array<{ name: string; value: number; distance: number; category: MagneticSource["category"] }>;
 
     const now = new Date();
-    const microSecretMultiplier = microSecretScheduledMultiplier(now);
-    const microSecretActive = microSecretMultiplier > 0 || (isPstMicroSecretToggleWindow(now) && microSecretOfftimeEnabled);
-    const vancouverWeakening = vancouverWeakeningProgress(now);
+    const vancouverTimeZone = timeZoneByCoordinate[coordinateKey(EASTER_EGG)] ?? "America/Los_Angeles";
+    const microSecretMultiplier = microSecretScheduledMultiplier(vancouverTimeZone, now);
+    const microSecretActive = microSecretMultiplier > 0 || (isMicroSecretToggleWindow(vancouverTimeZone, now) && microSecretOfftimeEnabled);
+    const vancouverWeakening = vancouverWeakeningProgress(vancouverTimeZone, now);
 
     const baseBreakdown = MAGNETIC_SOURCES.map((source) => {
       const dist = distanceKm(activePosition, source.center);
@@ -652,7 +700,7 @@ export default function Home() {
         }
 
         const baseValue = magneticValueFromBands(dist, source.bands);
-        const value = isPstMicroSecretToggleWindow(now) && microSecretOfftimeEnabled ? baseValue : baseValue * microSecretMultiplier;
+        const value = isMicroSecretToggleWindow(vancouverTimeZone, now) && microSecretOfftimeEnabled ? baseValue : baseValue * microSecretMultiplier;
         return { name: source.name, value, distance: dist, category: source.category };
       }
 
@@ -670,14 +718,14 @@ export default function Home() {
       const dist = distanceKm(activePosition, field.center);
       return {
         name: `${field.name} (${field.visibility})`,
-        value: uploadedFieldValue(dist, field, now),
+        value: uploadedFieldValue(dist, field, timeZoneByCoordinate[coordinateKey(field.center)] ?? "UTC", now),
         distance: dist,
         category: "secret" as const
       };
     });
 
     return [...baseBreakdown, ...uploadedBreakdown].sort((a, b) => b.value - a.value);
-  }, [activePosition, microSecretOfftimeEnabled, refreshTick, uploadedFields]);
+  }, [activePosition, microSecretOfftimeEnabled, refreshTick, timeZoneByCoordinate, uploadedFields]);
 
   const fieldStrength = useMemo(() => magneticBreakdown.reduce((sum, item) => sum + item.value, 0), [magneticBreakdown]);
   const regularFieldStrength = useMemo(() => magneticBreakdown.filter((item) => item.category === "regular").reduce((sum, item) => sum + item.value, 0), [magneticBreakdown]);
@@ -1118,14 +1166,14 @@ export default function Home() {
           ) : (
             <p className="badge">Location Simulator unlocked</p>
           )}
-          {simulatorUnlocked && isPstMicroSecretToggleWindow() && (
+          {simulatorUnlocked && isMicroSecretToggleWindow(timeZoneByCoordinate[coordinateKey(EASTER_EGG)] ?? "America/Los_Angeles") && (
             <label className="offtime-toggle">
               <input
                 type="checkbox"
                 checked={microSecretOfftimeEnabled}
                 onChange={(event) => setMicroSecretOfftimeEnabled(event.target.checked)}
               />
-              Enable off-time micro secret field override (7:00pm-10:00am PST)
+              Enable off-time micro secret field override (7:00pm-10:00am local Vancouver time)
             </label>
           )}
           {simulatorUnlocked && <div className="preset-row">
@@ -1213,11 +1261,11 @@ export default function Home() {
             <input value={fieldLonInput} onChange={(event) => setFieldLonInput(event.target.value)} placeholder="-80.844909" />
           </label>
           <label>
-            Start time PST (optional)
+            Start time (field local time, optional)
             <input type="time" value={fieldStartTimeInput} onChange={(event) => setFieldStartTimeInput(event.target.value)} />
           </label>
           <label>
-            End time PST (optional)
+            End time (field local time, optional)
             <input type="time" value={fieldEndTimeInput} onChange={(event) => setFieldEndTimeInput(event.target.value)} />
           </label>
           <button type="button" onClick={submitFieldUploader}>{editingFieldId ? "Save field changes" : "Upload field"}</button>
@@ -1236,7 +1284,7 @@ export default function Home() {
                 <p><strong>{field.name}</strong> <span className="badge">{field.visibility}</span></p>
                 <p>Center: {field.center.lat.toFixed(6)}, {field.center.lon.toFixed(6)}</p>
                 <p>x: {field.maxIntensity} | y: {field.maxRangeMeters}m</p>
-                <p>Schedule: {field.startTime && field.endTime ? `${field.startTime}-${field.endTime} PST (±5m fades)` : "Always on"}</p>
+                <p>Schedule: {field.startTime && field.endTime ? `${field.startTime}-${field.endTime} local time (±5m fades)` : "Always on"}</p>
                 <div className="preset-row field-action-buttons">
                   <button type="button" onClick={() => editUploadedField(field)}>Edit</button>
                   <button type="button" onClick={() => removeUploadedField(field.id)}>Delete</button>
