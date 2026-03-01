@@ -231,6 +231,17 @@ h2 {
   margin-bottom: 0.75rem;
 }
 
+
+.created-fields-list summary {
+  cursor: pointer;
+  font-weight: 700;
+  margin-bottom: 0.65rem;
+}
+
+.created-fields-list[open] summary {
+  margin-bottom: 0.8rem;
+}
+
 .target-selector {
   margin-top: 0.25rem;
   width: 100%;

@@ -1012,9 +1012,12 @@ export default function Home() {
     setFieldLonInput(field.center.lon.toString());
   };
 
-  const removeUploadedField = (fieldId: string) => {
-    setUploadedFields((prev) => prev.filter((item) => item.id !== fieldId));
-    if (editingFieldId === fieldId) resetFieldUploaderForm();
+  const removeUploadedField = (field: UploadedSecretField) => {
+    const confirmed = window.confirm(`Delete field "${field.name}"? This cannot be undone.`);
+    if (!confirmed) return;
+
+    setUploadedFields((prev) => prev.filter((item) => item.id !== field.id));
+    if (editingFieldId === field.id) resetFieldUploaderForm();
   };
 
 
@@ -1364,8 +1367,9 @@ export default function Home() {
 
       {uploadedFields.length > 0 && (
         <section className="teleport">
-          <h3>Created Secret Fields</h3>
-          <div className="password-lock">
+          <details className="created-fields-list" open>
+            <summary>Created Secret Fields ({uploadedFields.length})</summary>
+            <div className="password-lock">
             {uploadedFields.map((field) => (
               <div key={field.id} className="stats">
                 <p><strong>{field.name}</strong> <span className="badge">{field.visibility}</span></p>
@@ -1375,11 +1379,12 @@ export default function Home() {
                 <p>Days: {(field.activeDays?.length ? field.activeDays : ALL_WEEK_DAYS).map((day) => WEEK_DAY_OPTIONS.find((option) => option.value === day)?.label ?? "").join(", ")}</p>
                 <div className="preset-row field-action-buttons">
                   <button type="button" onClick={() => editUploadedField(field)}>Edit</button>
-                  <button type="button" onClick={() => removeUploadedField(field.id)}>Delete</button>
+                  <button type="button" onClick={() => removeUploadedField(field)}>Delete</button>
                 </div>
               </div>
             ))}
-          </div>
+            </div>
+          </details>
         </section>
       )}
 
