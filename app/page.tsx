@@ -554,9 +554,9 @@ export default function Home() {
   const [fieldVisibility, setFieldVisibility] = useState<"public" | "private">("private");
   const [fieldStartTimeInput, setFieldStartTimeInput] = useState("");
   const [fieldEndTimeInput, setFieldEndTimeInput] = useState("");
-  const [soundEnabled, setSoundEnabled] = useState(true);
-  const [startupPopupVisible, setStartupPopupVisible] = useState(true);
-  const [startupSoundToggle, setStartupSoundToggle] = useState(false);
+  const [fieldLatInput, setFieldLatInput] = useState("");
+  const [fieldLonInput, setFieldLonInput] = useState("");
+  const [soundEnabled, setSoundEnabled] = useState(false);
 
   const audioContextRef = useRef<AudioContext | null>(null);
   const beepAccumulatorRef = useRef(0);
@@ -794,15 +794,35 @@ export default function Home() {
     setFieldVisibility("private");
     setFieldStartTimeInput("");
     setFieldEndTimeInput("");
+    setFieldLatInput("");
+    setFieldLonInput("");
   };
 
   const submitFieldUploader = () => {
 
-    const basePosition = activePosition;
-    if (!basePosition) {
-      setError("Need an active location before uploading a field.");
+    const providedLat = fieldLatInput.trim() ? Number(fieldLatInput) : null;
+    const providedLon = fieldLonInput.trim() ? Number(fieldLonInput) : null;
+
+    if ((providedLat === null) !== (providedLon === null)) {
+      setError("Enter both latitude and longitude, or leave both empty.");
       return;
     }
+
+    const fallbackPosition = activePosition;
+    if ((providedLat === null || providedLon === null) && !fallbackPosition) {
+      setError("Need active location or explicit coordinates before uploading a field.");
+      return;
+    }
+
+    if ((providedLat !== null && (Number.isNaN(providedLat) || providedLat < -90 || providedLat > 90)) ||
+      (providedLon !== null && (Number.isNaN(providedLon) || providedLon < -180 || providedLon > 180))) {
+      setError("Coordinates must be valid latitude/longitude values.");
+      return;
+    }
+
+    const center = providedLat !== null && providedLon !== null
+      ? { lat: providedLat, lon: providedLon }
+      : (fallbackPosition as Coordinates);
 
     const maxIntensity = Number(fieldIntensityInput);
     const maxRangeMeters = Number(fieldRangeInput);
@@ -830,7 +850,7 @@ export default function Home() {
     const payload: UploadedSecretField = {
       id: editingFieldId ?? `uploaded-${Date.now()}`,
       name: fieldNameInput.trim(),
-      center: basePosition,
+      center,
       maxIntensity,
       maxRangeMeters,
       visibility: fieldVisibility,
@@ -855,6 +875,8 @@ export default function Home() {
     setFieldVisibility(field.visibility);
     setFieldStartTimeInput(field.startTime);
     setFieldEndTimeInput(field.endTime);
+    setFieldLatInput(field.center.lat.toString());
+    setFieldLonInput(field.center.lon.toString());
   };
 
   const removeUploadedField = (fieldId: string) => {
@@ -863,12 +885,7 @@ export default function Home() {
   };
 
 
-  const closeStartupPopup = () => {
-    setSoundEnabled(startupSoundToggle);
-    setStartupPopupVisible(false);
-  };
-
-  const effectiveSoundEnabled = soundEnabled && !startupPopupVisible;
+  const effectiveSoundEnabled = soundEnabled;
   const beepsPerSecond = Math.min(Math.max(animatedFieldStrength * 0.01, 0), 40);
   const beepVolume = useMemo(() => {
     if (animatedFieldStrength < 100) return 0;
@@ -977,38 +994,6 @@ export default function Home() {
       </h1>
       <p className="subtitle">Detect when you are near a Charlotte.</p>
 
-      <label className="sound-toggle">
-        <input
-          type="checkbox"
-          checked={soundEnabled}
-          onChange={(event) => setSoundEnabled(event.target.checked)}
-        />
-        Sounds {soundEnabled ? "On" : "Off"}
-      </label>
-
-      {startupPopupVisible && (
-        <div className="starter-popup-backdrop" role="dialog" aria-modal="true" aria-labelledby="starter-popup-title">
-          <div className="starter-popup">
-            <button type="button" className="popup-close" onClick={closeStartupPopup} aria-label="Close intro popup">
-              ×
-            </button>
-            <h2 id="starter-popup-title">Charlotte Magnetic Field</h2>
-            <p>Welcome! This detector estimates your current Charlotte magnetic field and adjusts visuals, particles, and pulse behavior live.</p>
-            <label className="sound-toggle">
-              <input
-                type="checkbox"
-                checked={startupSoundToggle}
-                onChange={(event) => setStartupSoundToggle(event.target.checked)}
-              />
-              Enable sounds after this popup
-            </label>
-            <button type="button" onClick={closeStartupPopup}>
-              OK
-            </button>
-          </div>
-        </div>
-      )}
-
       <section className={`field-core ${isLoadingField ? "is-loading" : ""}`}>
         <div className="field-particles" />
         <div
@@ -1064,6 +1049,10 @@ export default function Home() {
             ))}
           </section>
       </details>
+
+      <button type="button" className="sim-toggle" onClick={() => setSoundEnabled((prev) => !prev)}>
+        Sound: {soundEnabled ? "On" : "Off"}
+      </button>
 
       {toTarget && (
         <section className="stats">
@@ -1143,10 +1132,9 @@ export default function Home() {
             </button>
           </div>}
 
-          {simulatorUnlocked && (
-            <section className="teleport">
+          <section className="teleport">
               <h3>Secret Field Uploader</h3>
-              <p className="badge">Designated storage: browser local storage</p>
+              <p className="badge">Designated storage: shared browser local storage list</p>
               <div className="password-lock">
                 <label>
                   Field name
@@ -1166,6 +1154,14 @@ export default function Home() {
                     <option value="private">Visible to me only</option>
                     <option value="public">Public</option>
                   </select>
+                </label>
+                <label>
+                  Latitude (optional, defaults to current location)
+                  <input value={fieldLatInput} onChange={(event) => setFieldLatInput(event.target.value)} placeholder="35.228676" />
+                </label>
+                <label>
+                  Longitude (optional, defaults to current location)
+                  <input value={fieldLonInput} onChange={(event) => setFieldLonInput(event.target.value)} placeholder="-80.844909" />
                 </label>
                 <label>
                   Start time PST (optional)
@@ -1199,7 +1195,6 @@ export default function Home() {
                 </div>
               )}
             </section>
-          )}
           {simulatorUnlocked && <label>
             Latitude
             <input value={simLatInput} onChange={(e) => setSimLatInput(e.target.value)} placeholder="35.22867647481079" />
