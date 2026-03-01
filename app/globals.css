@@ -166,6 +166,11 @@ h2 {
   margin-top: 1rem;
 }
 
+.sound-toggle-button {
+  margin-top: 0.55rem;
+  margin-bottom: 0.35rem;
+}
+
 
 .target-list {
   margin-top: 1rem;

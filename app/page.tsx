@@ -1050,7 +1050,7 @@ export default function Home() {
           </section>
       </details>
 
-      <button type="button" className="sim-toggle" onClick={() => setSoundEnabled((prev) => !prev)}>
+      <button type="button" className="sim-toggle sound-toggle-button" onClick={() => setSoundEnabled((prev) => !prev)}>
         Sound: {soundEnabled ? "On" : "Off"}
       </button>
 
@@ -1131,70 +1131,6 @@ export default function Home() {
               Use Queen Charlotte Burial Place
             </button>
           </div>}
-
-          <section className="teleport">
-              <h3>Secret Field Uploader</h3>
-              <p className="badge">Designated storage: shared browser local storage list</p>
-              <div className="password-lock">
-                <label>
-                  Field name
-                  <input value={fieldNameInput} onChange={(event) => setFieldNameInput(event.target.value)} placeholder="My secret field" />
-                </label>
-                <label>
-                  Field intensity max (x, max 50,000)
-                  <input value={fieldIntensityInput} onChange={(event) => setFieldIntensityInput(event.target.value)} inputMode="numeric" />
-                </label>
-                <label>
-                  Maximum intensity range (y meters, max 100m)
-                  <input value={fieldRangeInput} onChange={(event) => setFieldRangeInput(event.target.value)} inputMode="decimal" />
-                </label>
-                <label>
-                  Visibility
-                  <select value={fieldVisibility} onChange={(event) => setFieldVisibility(event.target.value as "public" | "private")}>
-                    <option value="private">Visible to me only</option>
-                    <option value="public">Public</option>
-                  </select>
-                </label>
-                <label>
-                  Latitude (optional, defaults to current location)
-                  <input value={fieldLatInput} onChange={(event) => setFieldLatInput(event.target.value)} placeholder="35.228676" />
-                </label>
-                <label>
-                  Longitude (optional, defaults to current location)
-                  <input value={fieldLonInput} onChange={(event) => setFieldLonInput(event.target.value)} placeholder="-80.844909" />
-                </label>
-                <label>
-                  Start time PST (optional)
-                  <input type="time" value={fieldStartTimeInput} onChange={(event) => setFieldStartTimeInput(event.target.value)} />
-                </label>
-                <label>
-                  End time PST (optional)
-                  <input type="time" value={fieldEndTimeInput} onChange={(event) => setFieldEndTimeInput(event.target.value)} />
-                </label>
-                <button type="button" onClick={submitFieldUploader}>{editingFieldId ? "Save field changes" : "Upload field"}</button>
-                {editingFieldId && (
-                  <button type="button" onClick={resetFieldUploaderForm}>Cancel editing</button>
-                )}
-              </div>
-
-              {uploadedFields.length > 0 && (
-                <div className="password-lock">
-                  <strong>Uploaded fields</strong>
-                  {uploadedFields.map((field) => (
-                    <div key={field.id} className="stats">
-                      <p><strong>{field.name}</strong> <span className="badge">{field.visibility}</span></p>
-                      <p>Center: {field.center.lat.toFixed(6)}, {field.center.lon.toFixed(6)}</p>
-                      <p>x: {field.maxIntensity} | y: {field.maxRangeMeters}m</p>
-                      <p>Schedule: {field.startTime && field.endTime ? `${field.startTime}-${field.endTime} PST (±5m fades)` : "Always on"}</p>
-                      <div className="preset-row">
-                        <button type="button" onClick={() => editUploadedField(field)}>Edit</button>
-                        <button type="button" onClick={() => removeUploadedField(field.id)}>Delete</button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </section>
           {simulatorUnlocked && <label>
             Latitude
             <input value={simLatInput} onChange={(e) => setSimLatInput(e.target.value)} placeholder="35.22867647481079" />
@@ -1220,6 +1156,71 @@ export default function Home() {
           )}
         </form>
       )}
+
+
+      <section className="teleport">
+        <h3>Secret Field Uploader</h3>
+        <p className="badge">Designated storage: shared browser local storage list</p>
+        <div className="password-lock">
+          <label>
+            Field name
+            <input value={fieldNameInput} onChange={(event) => setFieldNameInput(event.target.value)} placeholder="My secret field" />
+          </label>
+          <label>
+            Field intensity max (x, max 50,000)
+            <input value={fieldIntensityInput} onChange={(event) => setFieldIntensityInput(event.target.value)} inputMode="numeric" />
+          </label>
+          <label>
+            Maximum intensity range (y meters, max 100m)
+            <input value={fieldRangeInput} onChange={(event) => setFieldRangeInput(event.target.value)} inputMode="decimal" />
+          </label>
+          <label>
+            Visibility
+            <select value={fieldVisibility} onChange={(event) => setFieldVisibility(event.target.value as "public" | "private")}>
+              <option value="private">Visible to me only</option>
+              <option value="public">Public</option>
+            </select>
+          </label>
+          <label>
+            Latitude (optional, defaults to current location)
+            <input value={fieldLatInput} onChange={(event) => setFieldLatInput(event.target.value)} placeholder="35.228676" />
+          </label>
+          <label>
+            Longitude (optional, defaults to current location)
+            <input value={fieldLonInput} onChange={(event) => setFieldLonInput(event.target.value)} placeholder="-80.844909" />
+          </label>
+          <label>
+            Start time PST (optional)
+            <input type="time" value={fieldStartTimeInput} onChange={(event) => setFieldStartTimeInput(event.target.value)} />
+          </label>
+          <label>
+            End time PST (optional)
+            <input type="time" value={fieldEndTimeInput} onChange={(event) => setFieldEndTimeInput(event.target.value)} />
+          </label>
+          <button type="button" onClick={submitFieldUploader}>{editingFieldId ? "Save field changes" : "Upload field"}</button>
+          {editingFieldId && (
+            <button type="button" onClick={resetFieldUploaderForm}>Cancel editing</button>
+          )}
+        </div>
+
+        {uploadedFields.length > 0 && (
+          <div className="password-lock">
+            <strong>Uploaded fields</strong>
+            {uploadedFields.map((field) => (
+              <div key={field.id} className="stats">
+                <p><strong>{field.name}</strong> <span className="badge">{field.visibility}</span></p>
+                <p>Center: {field.center.lat.toFixed(6)}, {field.center.lon.toFixed(6)}</p>
+                <p>x: {field.maxIntensity} | y: {field.maxRangeMeters}m</p>
+                <p>Schedule: {field.startTime && field.endTime ? `${field.startTime}-${field.endTime} PST (±5m fades)` : "Always on"}</p>
+                <div className="preset-row">
+                  <button type="button" onClick={() => editUploadedField(field)}>Edit</button>
+                  <button type="button" onClick={() => removeUploadedField(field.id)}>Delete</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
 
       {teleportVisible && (
         <form onSubmit={submitTeleport} className="teleport teleport-secret">
