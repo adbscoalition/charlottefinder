@@ -34,11 +34,22 @@ type UploadedSecretField = {
   visibility: "private";
   startTime: string;
   endTime: string;
+  activeDays: number[];
 };
 
 const CUSTOM_FIELD_STORAGE_KEY = "clt-custom-secret-fields-storage";
 const MAX_UPLOADED_INTENSITY = 50000;
 const MAX_UPLOADED_RANGE_METERS = 100;
+const ALL_WEEK_DAYS = [0, 1, 2, 3, 4, 5, 6];
+const WEEK_DAY_OPTIONS: Array<{ value: number; label: string }> = [
+  { value: 0, label: "Sun" },
+  { value: 1, label: "Mon" },
+  { value: 2, label: "Tue" },
+  { value: 3, label: "Wed" },
+  { value: 4, label: "Thu" },
+  { value: 5, label: "Fri" },
+  { value: 6, label: "Sat" }
+];
 
 const CHARLOTTE: Coordinates = { lat: 35.22867647481079, lon: -80.84490976473366 };
 const EASTER_EGG: Coordinates = { lat: 49.2729341959022, lon: -123.06941193669999 };
@@ -364,6 +375,25 @@ function getTimeZoneTotalMinutes(timeZone: string, now = new Date()) {
   return hour * 60 + minute + second / 60;
 }
 
+function getTimeZoneWeekDay(timeZone: string, now = new Date()) {
+  const weekDayRaw = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    weekday: "short"
+  }).format(now);
+
+  const map: Record<string, number> = {
+    Sun: 0,
+    Mon: 1,
+    Tue: 2,
+    Wed: 3,
+    Thu: 4,
+    Fri: 5,
+    Sat: 6
+  };
+
+  return map[weekDayRaw] ?? now.getDay();
+}
+
 function toRangeProgress(value: number, start: number, end: number) {
   if (value <= start) return 0;
   if (value >= end) return 1;
@@ -505,6 +535,10 @@ function uploadedFieldValue(distanceKm: number, field: UploadedSecretField, time
     }
   }
 
+  const normalizedDays = field.activeDays?.length ? field.activeDays : ALL_WEEK_DAYS;
+  const localWeekDay = getTimeZoneWeekDay(timeZone, now);
+  if (!normalizedDays.includes(localWeekDay)) return 0;
+
   if (!field.startTime || !field.endTime) return value;
   const fade = timeWindowMultiplier(getTimeZoneTotalMinutes(timeZone, now), field.startTime, field.endTime);
   return value * fade;
@@ -564,9 +598,9 @@ export default function Home() {
   const [fieldNameInput, setFieldNameInput] = useState("");
   const [fieldIntensityInput, setFieldIntensityInput] = useState("5000");
   const [fieldRangeInput, setFieldRangeInput] = useState("100");
-  const [fieldVisibility, setFieldVisibility] = useState<"private">("private");
   const [fieldStartTimeInput, setFieldStartTimeInput] = useState("");
   const [fieldEndTimeInput, setFieldEndTimeInput] = useState("");
+  const [fieldActiveDaysInput, setFieldActiveDaysInput] = useState<number[]>([...ALL_WEEK_DAYS]);
   const [fieldLatInput, setFieldLatInput] = useState("");
   const [fieldLonInput, setFieldLonInput] = useState("");
   const [soundEnabled, setSoundEnabled] = useState(false);
@@ -633,12 +667,18 @@ export default function Home() {
     try {
       const raw = window.localStorage.getItem(CUSTOM_FIELD_STORAGE_KEY);
       if (!raw) return;
-      const parsed = JSON.parse(raw) as Array<UploadedSecretField | (UploadedSecretField & { visibility?: "public" | "private" })>;
+      const parsed = JSON.parse(raw) as Array<UploadedSecretField | (UploadedSecretField & { visibility?: "public" | "private"; activeDays?: number[] })>;
       if (Array.isArray(parsed)) {
         setUploadedFields(
           parsed.map((field) => ({
             ...field,
-            visibility: "private" as const
+            visibility: "private" as const,
+            activeDays: (() => {
+              const validDays = Array.isArray(field.activeDays)
+                ? field.activeDays.filter((value) => Number.isInteger(value) && value >= 0 && value <= 6)
+                : [];
+              return validDays.length > 0 ? validDays : [...ALL_WEEK_DAYS];
+            })()
           }))
         );
       }
@@ -874,9 +914,9 @@ export default function Home() {
     setFieldNameInput("");
     setFieldIntensityInput("5000");
     setFieldRangeInput("100");
-    setFieldVisibility("private");
     setFieldStartTimeInput("");
     setFieldEndTimeInput("");
+    setFieldActiveDaysInput([...ALL_WEEK_DAYS]);
     setFieldLatInput("");
     setFieldLonInput("");
   };
@@ -934,6 +974,11 @@ export default function Home() {
       return;
     }
 
+    if (fieldActiveDaysInput.length === 0) {
+      setError("Select at least one day of the week.");
+      return;
+    }
+
     const payload: UploadedSecretField = {
       id: editingFieldId ?? `uploaded-${Date.now()}`,
       name: resolvedFieldName,
@@ -942,7 +987,8 @@ export default function Home() {
       maxRangeMeters,
       visibility: "private",
       startTime: fieldStartTimeInput,
-      endTime: fieldEndTimeInput
+      endTime: fieldEndTimeInput,
+      activeDays: [...fieldActiveDaysInput].sort((a, b) => a - b)
     };
 
     setUploadedFields((prev) => {
@@ -959,9 +1005,9 @@ export default function Home() {
     setFieldNameInput(field.name);
     setFieldIntensityInput(field.maxIntensity.toString());
     setFieldRangeInput(field.maxRangeMeters.toString());
-    setFieldVisibility("private");
     setFieldStartTimeInput(field.startTime);
     setFieldEndTimeInput(field.endTime);
+    setFieldActiveDaysInput(field.activeDays?.length ? [...field.activeDays] : [...ALL_WEEK_DAYS]);
     setFieldLatInput(field.center.lat.toString());
     setFieldLonInput(field.center.lon.toString());
   };
@@ -1285,6 +1331,30 @@ export default function Home() {
             End time (field local time, optional)
             <input type="time" value={fieldEndTimeInput} onChange={(event) => setFieldEndTimeInput(event.target.value)} />
           </label>
+          <fieldset className="weekday-picker">
+            <legend>Active days</legend>
+            <div className="weekday-options">
+              {WEEK_DAY_OPTIONS.map((day) => {
+                const isChecked = fieldActiveDaysInput.includes(day.value);
+                return (
+                  <label key={day.value} className="weekday-option">
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={(event) => {
+                        if (event.target.checked) {
+                          setFieldActiveDaysInput((prev) => Array.from(new Set([...prev, day.value])).sort((a, b) => a - b));
+                          return;
+                        }
+                        setFieldActiveDaysInput((prev) => prev.filter((value) => value !== day.value));
+                      }}
+                    />
+                    {day.label}
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
           <button type="button" onClick={submitFieldUploader}>{editingFieldId ? "Save field changes" : "Upload field"}</button>
           {editingFieldId && (
             <button type="button" onClick={resetFieldUploaderForm}>Cancel editing</button>
@@ -1302,6 +1372,7 @@ export default function Home() {
                 <p>Center: {field.center.lat.toFixed(6)}, {field.center.lon.toFixed(6)}</p>
                 <p>x: {field.maxIntensity} | y: {field.maxRangeMeters}m</p>
                 <p>Schedule: {field.startTime && field.endTime ? `${field.startTime}-${field.endTime} local time (±5m fades)` : "Always on"}</p>
+                <p>Days: {(field.activeDays?.length ? field.activeDays : ALL_WEEK_DAYS).map((day) => WEEK_DAY_OPTIONS.find((option) => option.value === day)?.label ?? "").join(", ")}</p>
                 <div className="preset-row field-action-buttons">
                   <button type="button" onClick={() => editUploadedField(field)}>Edit</button>
                   <button type="button" onClick={() => removeUploadedField(field.id)}>Delete</button>
