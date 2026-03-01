@@ -50,6 +50,7 @@ const CHARLOTTETOWN_PEI: Coordinates = { lat: 46.23722371252871, lon: -63.129701
 const VANCOUVER_MICRO_SECRET: Coordinates = { lat: 49.27295878743672, lon: -123.06939862529713 };
 const CHARLOTTESVILLE_VA: Coordinates = { lat: 38.0292848205594, lon: -78.47616344837674 };
 const QUEEN_CHARLOTTE_BURIAL_PLACE: Coordinates = { lat: 51.4836838439432, lon: -0.60668429494321 };
+const GEOLOCATION_DENIED_FALLBACK: Coordinates = { lat: 84.99999991933562, lon: -110.97606616281583 };
 
 const COMPASS_TARGETS: CompassTarget[] = [
   { label: "Charlotte, NC", center: CHARLOTTE },
@@ -599,11 +600,11 @@ export default function Home() {
       (err) => {
         if (err.code === err.PERMISSION_DENIED) {
           if (!spoofActive) {
-            setPosition(CHARLOTTE);
+            setPosition(GEOLOCATION_DENIED_FALLBACK);
           }
           setGeolocationDenied(true);
           setHasInitialFix(true);
-          setError("Geolocation denied. Defaulting to Charlotte, NC.");
+          setError("Geolocation denied. Defaulting to fallback coordinates.");
           return;
         }
 
@@ -818,10 +819,10 @@ export default function Home() {
       },
       (geoError) => {
         if (geoError.code === geoError.PERMISSION_DENIED) {
-          setPosition(CHARLOTTE);
+          setPosition(GEOLOCATION_DENIED_FALLBACK);
           setGeolocationDenied(true);
           setHasInitialFix(true);
-          setError("Geolocation denied. Defaulting to Charlotte, NC.");
+          setError("Geolocation denied. Defaulting to fallback coordinates.");
           return;
         }
 
