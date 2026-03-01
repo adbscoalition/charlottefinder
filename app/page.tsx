@@ -567,7 +567,9 @@ export default function Home() {
 
   useEffect(() => {
     if (!navigator.geolocation) {
-      setError("Geolocation is not available in this browser.");
+      setPosition(CHARLOTTE);
+      setHasInitialFix(true);
+      setError("Geolocation is not available. Defaulting to Charlotte, NC.");
       return;
     }
 
@@ -580,6 +582,15 @@ export default function Home() {
         setError("");
       },
       (err) => {
+        if (err.code === err.PERMISSION_DENIED) {
+          if (!spoofActive) {
+            setPosition(CHARLOTTE);
+          }
+          setHasInitialFix(true);
+          setError("Geolocation denied. Defaulting to Charlotte, NC.");
+          return;
+        }
+
         setError(err.message);
       },
       { enableHighAccuracy: true }
@@ -744,9 +755,21 @@ export default function Home() {
     setSpoofActive(false);
 
     if (!navigator.geolocation) return;
-    navigator.geolocation.getCurrentPosition((pos) => {
-      setPosition({ lat: pos.coords.latitude, lon: pos.coords.longitude });
-    });
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setPosition({ lat: pos.coords.latitude, lon: pos.coords.longitude });
+      },
+      (geoError) => {
+        if (geoError.code === geoError.PERMISSION_DENIED) {
+          setPosition(CHARLOTTE);
+          setHasInitialFix(true);
+          setError("Geolocation denied. Defaulting to Charlotte, NC.");
+          return;
+        }
+
+        setError(geoError.message);
+      }
+    );
   };
 
   const submitSimulator = (event: FormEvent<HTMLFormElement>) => {
@@ -1202,10 +1225,12 @@ export default function Home() {
             <button type="button" onClick={resetFieldUploaderForm}>Cancel editing</button>
           )}
         </div>
+      </section>
 
-        {uploadedFields.length > 0 && (
+      {uploadedFields.length > 0 && (
+        <section className="teleport">
+          <h3>Created Secret Fields</h3>
           <div className="password-lock">
-            <strong>Uploaded fields</strong>
             {uploadedFields.map((field) => (
               <div key={field.id} className="stats">
                 <p><strong>{field.name}</strong> <span className="badge">{field.visibility}</span></p>
@@ -1219,8 +1244,8 @@ export default function Home() {
               </div>
             ))}
           </div>
-        )}
-      </section>
+        </section>
+      )}
 
       {teleportVisible && (
         <form onSubmit={submitTeleport} className="teleport teleport-secret">
