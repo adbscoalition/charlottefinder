@@ -898,10 +898,14 @@ export default function Home() {
     const maxIntensity = Number(fieldIntensityInput);
     const maxRangeMeters = Number(fieldRangeInput);
 
-    if (!fieldNameInput.trim()) {
-      setError("Field name is required.");
-      return;
-    }
+    const trimmedName = fieldNameInput.trim();
+    const existingAutoNumbers = uploadedFields
+      .map((field) => /^My Field (\d+)$/.exec(field.name)?.[1])
+      .filter((value): value is string => Boolean(value))
+      .map((value) => Number(value))
+      .filter((value) => Number.isFinite(value));
+    const nextAutoFieldNumber = existingAutoNumbers.length > 0 ? Math.max(...existingAutoNumbers) + 1 : 1;
+    const resolvedFieldName = trimmedName || `My Field ${nextAutoFieldNumber}`;
 
     if (Number.isNaN(maxIntensity) || maxIntensity <= 0 || maxIntensity > MAX_UPLOADED_INTENSITY) {
       setError(`Field intensity must be between 1 and ${MAX_UPLOADED_INTENSITY}.`);
@@ -920,7 +924,7 @@ export default function Home() {
 
     const payload: UploadedSecretField = {
       id: editingFieldId ?? `uploaded-${Date.now()}`,
-      name: fieldNameInput.trim(),
+      name: resolvedFieldName,
       center,
       maxIntensity,
       maxRangeMeters,
@@ -1234,8 +1238,8 @@ export default function Home() {
         <p className="badge">Designated storage: shared browser local storage list</p>
         <div className="password-lock">
           <label>
-            Field name
-            <input value={fieldNameInput} onChange={(event) => setFieldNameInput(event.target.value)} placeholder="My secret field" />
+            Field name (optional)
+            <input value={fieldNameInput} onChange={(event) => setFieldNameInput(event.target.value)} placeholder="My Field 1" />
           </label>
           <label>
             Field intensity max (x, max 50,000)
