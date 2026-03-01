@@ -74,6 +74,43 @@ body {
 }
 
 
+
+.page-geolocation-denied {
+  background: #000 !important;
+}
+
+.page-geolocation-denied::before {
+  opacity: 0;
+}
+
+.page-geolocation-denied .space-particles {
+  opacity: 0.08;
+}
+
+.page-geolocation-denied .field-core,
+.page-geolocation-denied .stats,
+.page-geolocation-denied .teleport,
+.page-geolocation-denied .target-list,
+.page-geolocation-denied .password-lock {
+  background: linear-gradient(145deg, rgba(0, 0, 0, 0.96) 0%, rgba(0, 0, 0, 0.92) 100%);
+  border-color: #111827;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.85);
+}
+
+.field-core-denied .field-particles,
+.field-core-denied .field-meter {
+  display: none;
+}
+
+.field-denied-mark {
+  margin: 0.2rem auto 0.6rem;
+  line-height: 1;
+  font-size: clamp(6rem, 32vw, 10rem);
+  font-weight: 900;
+  color: #6b7280;
+  text-shadow: 0 0 24px rgba(255, 255, 255, 0.08);
+}
+
 .space-particles {
   position: absolute;
   inset: 0;

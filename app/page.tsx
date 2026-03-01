@@ -31,7 +31,7 @@ type UploadedSecretField = {
   center: Coordinates;
   maxIntensity: number;
   maxRangeMeters: number;
-  visibility: "public" | "private";
+  visibility: "private";
   startTime: string;
   endTime: string;
 };
@@ -563,13 +563,14 @@ export default function Home() {
   const [fieldNameInput, setFieldNameInput] = useState("");
   const [fieldIntensityInput, setFieldIntensityInput] = useState("5000");
   const [fieldRangeInput, setFieldRangeInput] = useState("100");
-  const [fieldVisibility, setFieldVisibility] = useState<"public" | "private">("private");
+  const [fieldVisibility, setFieldVisibility] = useState<"private">("private");
   const [fieldStartTimeInput, setFieldStartTimeInput] = useState("");
   const [fieldEndTimeInput, setFieldEndTimeInput] = useState("");
   const [fieldLatInput, setFieldLatInput] = useState("");
   const [fieldLonInput, setFieldLonInput] = useState("");
   const [soundEnabled, setSoundEnabled] = useState(false);
   const [timeZoneByCoordinate, setTimeZoneByCoordinate] = useState<Record<string, string>>({});
+  const [geolocationDenied, setGeolocationDenied] = useState(false);
 
   const audioContextRef = useRef<AudioContext | null>(null);
   const beepAccumulatorRef = useRef(0);
@@ -591,6 +592,7 @@ export default function Home() {
         if (!spoofActive) {
           setPosition({ lat: pos.coords.latitude, lon: pos.coords.longitude });
         }
+        setGeolocationDenied(false);
         setHasInitialFix(true);
         setError("");
       },
@@ -599,11 +601,13 @@ export default function Home() {
           if (!spoofActive) {
             setPosition(CHARLOTTE);
           }
+          setGeolocationDenied(true);
           setHasInitialFix(true);
           setError("Geolocation denied. Defaulting to Charlotte, NC.");
           return;
         }
 
+        setGeolocationDenied(false);
         setError(err.message);
       },
       { enableHighAccuracy: true }
@@ -628,8 +632,15 @@ export default function Home() {
     try {
       const raw = window.localStorage.getItem(CUSTOM_FIELD_STORAGE_KEY);
       if (!raw) return;
-      const parsed = JSON.parse(raw) as UploadedSecretField[];
-      if (Array.isArray(parsed)) setUploadedFields(parsed);
+      const parsed = JSON.parse(raw) as Array<UploadedSecretField | (UploadedSecretField & { visibility?: "public" | "private" })>;
+      if (Array.isArray(parsed)) {
+        setUploadedFields(
+          parsed.map((field) => ({
+            ...field,
+            visibility: "private" as const
+          }))
+        );
+      }
     } catch {
       // ignore malformed storage payloads
     }
@@ -717,7 +728,7 @@ export default function Home() {
     const uploadedBreakdown = uploadedFields.map((field) => {
       const dist = distanceKm(activePosition, field.center);
       return {
-        name: `${field.name} (${field.visibility})`,
+        name: field.name,
         value: uploadedFieldValue(dist, field, timeZoneByCoordinate[coordinateKey(field.center)] ?? "UTC", now),
         distance: dist,
         category: "secret" as const
@@ -776,6 +787,7 @@ export default function Home() {
   );
   const backdropDriftSeconds = useMemo(() => Math.max(16 - Math.min(animatedFieldStrength / 1100, 11), 4), [animatedFieldStrength]);
   const isLoadingField = !hasInitialFix && !simulatedPosition && !spoofActive && !error;
+  const geolocationDeniedView = geolocationDenied && !simulatedPosition && !spoofActive;
 
   useEffect(() => {
     document.title = `${isLoadingField ? "..." : formatField(animatedFieldStrength)} CLT Magnetic Field`;
@@ -806,15 +818,18 @@ export default function Home() {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         setPosition({ lat: pos.coords.latitude, lon: pos.coords.longitude });
+        setGeolocationDenied(false);
       },
       (geoError) => {
         if (geoError.code === geoError.PERMISSION_DENIED) {
           setPosition(CHARLOTTE);
+          setGeolocationDenied(true);
           setHasInitialFix(true);
           setError("Geolocation denied. Defaulting to Charlotte, NC.");
           return;
         }
 
+        setGeolocationDenied(false);
         setError(geoError.message);
       }
     );
@@ -928,7 +943,7 @@ export default function Home() {
       center,
       maxIntensity,
       maxRangeMeters,
-      visibility: fieldVisibility,
+      visibility: "private",
       startTime: fieldStartTimeInput,
       endTime: fieldEndTimeInput
     };
@@ -947,7 +962,7 @@ export default function Home() {
     setFieldNameInput(field.name);
     setFieldIntensityInput(field.maxIntensity.toString());
     setFieldRangeInput(field.maxRangeMeters.toString());
-    setFieldVisibility(field.visibility);
+    setFieldVisibility("private");
     setFieldStartTimeInput(field.startTime);
     setFieldEndTimeInput(field.endTime);
     setFieldLatInput(field.center.lat.toString());
@@ -1033,9 +1048,9 @@ export default function Home() {
 
   return (
     <main
-      className={`page ${rainbowUiState ? "page-rainbow-mode" : ""}`}
+      className={`page ${rainbowUiState ? "page-rainbow-mode" : ""} ${geolocationDeniedView ? "page-geolocation-denied" : ""}`}
       style={{
-        background: dynamicBackground,
+        background: geolocationDeniedView ? "#000000" : dynamicBackground,
         ["--orb-accent" as string]: pulseRingColor,
         ["--orb-value" as string]: fieldNumberColor,
         ["--orb-surface" as string]: uiSurfaceColor,
@@ -1069,42 +1084,48 @@ export default function Home() {
       </h1>
       <p className="subtitle">Detect when you are near a Charlotte.</p>
 
-      <section className={`field-core ${isLoadingField ? "is-loading" : ""}`}>
+      <section className={`field-core ${isLoadingField ? "is-loading" : ""} ${geolocationDeniedView ? "field-core-denied" : ""}`}>
         <div className="field-particles" />
-        <div
-          className={`field-orb ${shootingStarActive ? "field-orb-stars" : ""} ${destabilizedState ? "field-orb-destabilized" : ""}`}
-          style={{
-            ["--ring-color" as string]: pulseRingColor,
-            ["--ring-glow" as string]: rgbToCss(colorFromStops(animatedFieldStrength, PULSE_RING_STOPS), 0.85),
-            ["--shake-distance" as string]: `${destabilizedState ? Math.max(ringShake, 2.6) : ringShake}px`,
-            ["--pulse-speed" as string]: pulsesPerSecond > 0 ? `${Math.max(1 / pulsesPerSecond, 0.12)}s` : "1.2s",
-            ["--meter-speed" as string]: `${Math.max(0.25, 0.8 - Math.min(animatedFieldStrength / 20000, 0.5))}s`,
-            transform: `scale(${orbScale})`,
-            animationPlayState: pulsesPerSecond > 0 || isLoadingField ? "running" : "paused",
-            opacity: animatedFieldStrength <= 0 ? 0.8 : 1
-          }}
-        >
-          <span className="field-ring field-ring-a" />
-          <span className="field-ring field-ring-b" />
-          <span className="field-ring field-ring-c" />
-          <span className="field-core-dot" />
-          <span className="field-scanline" />
-        </div>
-        <div className="field-meter" aria-hidden style={{ ["--meter-color" as string]: pulseRingColor }}>
-          <span />
-          <span />
-          <span />
-          <span />
-          <span />
-        </div>
+        {geolocationDeniedView ? (
+          <div className="field-denied-mark" aria-label="Geolocation denied">✕</div>
+        ) : (
+          <>
+            <div
+              className={`field-orb ${shootingStarActive ? "field-orb-stars" : ""} ${destabilizedState ? "field-orb-destabilized" : ""}`}
+              style={{
+                ["--ring-color" as string]: pulseRingColor,
+                ["--ring-glow" as string]: rgbToCss(colorFromStops(animatedFieldStrength, PULSE_RING_STOPS), 0.85),
+                ["--shake-distance" as string]: `${destabilizedState ? Math.max(ringShake, 2.6) : ringShake}px`,
+                ["--pulse-speed" as string]: pulsesPerSecond > 0 ? `${Math.max(1 / pulsesPerSecond, 0.12)}s` : "1.2s",
+                ["--meter-speed" as string]: `${Math.max(0.25, 0.8 - Math.min(animatedFieldStrength / 20000, 0.5))}s`,
+                transform: `scale(${orbScale})`,
+                animationPlayState: pulsesPerSecond > 0 || isLoadingField ? "running" : "paused",
+                opacity: animatedFieldStrength <= 0 ? 0.8 : 1
+              }}
+            >
+              <span className="field-ring field-ring-a" />
+              <span className="field-ring field-ring-b" />
+              <span className="field-ring field-ring-c" />
+              <span className="field-core-dot" />
+              <span className="field-scanline" />
+            </div>
+            <div className="field-meter" aria-hidden style={{ ["--meter-color" as string]: pulseRingColor }}>
+              <span />
+              <span />
+              <span />
+              <span />
+              <span />
+            </div>
+          </>
+        )}
         <p
           className={`field-value ${destabilizedState ? "field-value-rainbow" : ""}`}
-          style={{ color: fieldNumberColor, ["--shake-distance" as string]: `${destabilizedState ? Math.max(numberShake, 2.2) : numberShake}px` }}
+          style={{ color: geolocationDeniedView ? "#9ca3af" : fieldNumberColor, ["--shake-distance" as string]: `${destabilizedState ? Math.max(numberShake, 2.2) : numberShake}px` }}
         >
-          {isLoadingField ? "..." : formatField(animatedFieldStrength)}
+          {geolocationDeniedView ? "✕" : isLoadingField ? "..." : formatField(animatedFieldStrength)}
         </p>
         <p className="field-label">CLT Magnetic Field™</p>
-        <p className="field-status">{isLoadingField ? "Calibrating magnetic sensors..." : statusMessage}</p>
+        <p className="field-status">{geolocationDeniedView ? "Where... am i?" : isLoadingField ? "Calibrating magnetic sensors..." : statusMessage}</p>
       </section>
 
       <details className="target-list" open>
@@ -1251,10 +1272,7 @@ export default function Home() {
           </label>
           <label>
             Visibility
-            <select value={fieldVisibility} onChange={(event) => setFieldVisibility(event.target.value as "public" | "private")}>
-              <option value="private">Visible to me only</option>
-              <option value="public">Public</option>
-            </select>
+            <input value="Visible to you only" readOnly />
           </label>
           <label>
             Latitude (optional, defaults to current location)
