@@ -410,6 +410,7 @@ h2 {
   border-radius: 14px;
   padding: 0.8rem 1rem;
   width: min(420px, 94vw);
+  box-sizing: border-box;
   text-align: left;
 }
 
@@ -456,6 +457,11 @@ h2 {
 
 .field-action-buttons {
   grid-template-columns: 1fr;
+}
+
+.password-lock .stats {
+  width: 100%;
+  max-width: 100%;
 }
 
 @media (max-width: 520px) {
