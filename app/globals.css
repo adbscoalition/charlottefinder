@@ -457,6 +457,7 @@ h2 {
 }
 
 input,
+select,
 button {
   font-family: var(--font-public-sans), Arial, sans-serif;
   border-radius: 10px;

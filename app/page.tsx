@@ -24,6 +24,22 @@ type CompassTarget = {
   center: Coordinates;
 };
 
+
+type UploadedSecretField = {
+  id: string;
+  name: string;
+  center: Coordinates;
+  maxIntensity: number;
+  maxRangeMeters: number;
+  visibility: "public" | "private";
+  startTime: string;
+  endTime: string;
+};
+
+const CUSTOM_FIELD_STORAGE_KEY = "clt-custom-secret-fields-storage";
+const MAX_UPLOADED_INTENSITY = 50000;
+const MAX_UPLOADED_RANGE_METERS = 100;
+
 const CHARLOTTE: Coordinates = { lat: 35.22867647481079, lon: -80.84490976473366 };
 const EASTER_EGG: Coordinates = { lat: 49.2729341959022, lon: -123.06941193669999 };
 const CHARLOTTE_MI: Coordinates = { lat: 42.56318196348821, lon: -84.83584647437215 };
@@ -427,6 +443,72 @@ function useCountingValue(targetValue: number, durationMs = 900) {
   return animatedValue;
 }
 
+
+function parseClockMinutes(value: string) {
+  const match = /^(\d{2}):(\d{2})$/.exec(value);
+  if (!match) return null;
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
+  return hour * 60 + minute;
+}
+
+function timeWindowMultiplier(nowMinutes: number, startTime: string, endTime: string) {
+  const start = parseClockMinutes(startTime);
+  const end = parseClockMinutes(endTime);
+  if (start === null || end === null) return 1;
+
+  const points = [nowMinutes, nowMinutes + 1440];
+
+  for (const point of points) {
+    let localStart = start;
+    let localEnd = end;
+
+    if (localEnd <= localStart) {
+      localEnd += 1440;
+      if (point < localStart) localStart -= 1440;
+    }
+
+    if (point >= localStart - 5 && point < localStart) {
+      return toRangeProgress(point, localStart - 5, localStart);
+    }
+    if (point >= localStart && point <= localEnd) {
+      return 1;
+    }
+    if (point > localEnd && point <= localEnd + 5) {
+      return 1 - toRangeProgress(point, localEnd, localEnd + 5);
+    }
+  }
+
+  return 0;
+}
+
+function uploadedFieldValue(distanceKm: number, field: UploadedSecretField, now = new Date()) {
+  const yKm = field.maxRangeMeters / 1000;
+  const x = field.maxIntensity;
+
+  const bands = [
+    { start: 0, end: 1 * yKm, startValue: x, endValue: x },
+    { start: 1 * yKm, end: 3 * yKm, startValue: x, endValue: 0.2 * x },
+    { start: 3 * yKm, end: 8 * yKm, startValue: 0.2 * x, endValue: 0.05 * x },
+    { start: 8 * yKm, end: 15 * yKm, startValue: 0.05 * x, endValue: 0.01 * x },
+    { start: 15 * yKm, end: 25 * yKm, startValue: 0.01 * x, endValue: 0 }
+  ];
+
+  let value = 0;
+  for (const band of bands) {
+    if (distanceKm <= band.end) {
+      const t = Math.min(Math.max((distanceKm - band.start) / Math.max(band.end - band.start, 1e-6), 0), 1);
+      value = lerp(band.startValue, band.endValue, t);
+      break;
+    }
+  }
+
+  if (!field.startTime || !field.endTime) return value;
+  const fade = timeWindowMultiplier(getPstTotalMinutes(now), field.startTime, field.endTime);
+  return value * fade;
+}
+
 function backgroundFromField(value: number) {
   const base = colorFromStops(value, BACKGROUND_STOPS);
   const top = mixRgb(base, { r: 255, g: 255, b: 255 }, 0.2);
@@ -464,6 +546,14 @@ export default function Home() {
   const [simulatorPasswordInput, setSimulatorPasswordInput] = useState("");
   const [simulatorUnlocked, setSimulatorUnlocked] = useState(false);
   const [microSecretOfftimeEnabled, setMicroSecretOfftimeEnabled] = useState(false);
+  const [uploadedFields, setUploadedFields] = useState<UploadedSecretField[]>([]);
+  const [editingFieldId, setEditingFieldId] = useState<string | null>(null);
+  const [fieldNameInput, setFieldNameInput] = useState("");
+  const [fieldIntensityInput, setFieldIntensityInput] = useState("5000");
+  const [fieldRangeInput, setFieldRangeInput] = useState("100");
+  const [fieldVisibility, setFieldVisibility] = useState<"public" | "private">("private");
+  const [fieldStartTimeInput, setFieldStartTimeInput] = useState("");
+  const [fieldEndTimeInput, setFieldEndTimeInput] = useState("");
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [startupPopupVisible, setStartupPopupVisible] = useState(true);
   const [startupSoundToggle, setStartupSoundToggle] = useState(false);
@@ -510,6 +600,21 @@ export default function Home() {
     };
   }, []);
 
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(CUSTOM_FIELD_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as UploadedSecretField[];
+      if (Array.isArray(parsed)) setUploadedFields(parsed);
+    } catch {
+      // ignore malformed storage payloads
+    }
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(CUSTOM_FIELD_STORAGE_KEY, JSON.stringify(uploadedFields));
+  }, [uploadedFields]);
+
   const activeTarget = COMPASS_TARGETS[activeTargetIndex] ?? COMPASS_TARGETS[0];
 
   const toTarget = useMemo(() => {
@@ -527,7 +632,7 @@ export default function Home() {
     const microSecretActive = microSecretMultiplier > 0 || (isPstMicroSecretToggleWindow(now) && microSecretOfftimeEnabled);
     const vancouverWeakening = vancouverWeakeningProgress(now);
 
-    return MAGNETIC_SOURCES.map((source) => {
+    const baseBreakdown = MAGNETIC_SOURCES.map((source) => {
       const dist = distanceKm(activePosition, source.center);
 
       if (source.name === "Vancouver Micro Secret") {
@@ -548,8 +653,20 @@ export default function Home() {
       }
 
       return { name: source.name, value: magneticValueFromBands(dist, source.bands), distance: dist, category: source.category };
-    }).sort((a, b) => b.value - a.value);
-  }, [activePosition, microSecretOfftimeEnabled, refreshTick]);
+    });
+
+    const uploadedBreakdown = uploadedFields.map((field) => {
+      const dist = distanceKm(activePosition, field.center);
+      return {
+        name: `${field.name} (${field.visibility})`,
+        value: uploadedFieldValue(dist, field, now),
+        distance: dist,
+        category: "secret" as const
+      };
+    });
+
+    return [...baseBreakdown, ...uploadedBreakdown].sort((a, b) => b.value - a.value);
+  }, [activePosition, microSecretOfftimeEnabled, refreshTick, uploadedFields]);
 
   const fieldStrength = useMemo(() => magneticBreakdown.reduce((sum, item) => sum + item.value, 0), [magneticBreakdown]);
   const regularFieldStrength = useMemo(() => magneticBreakdown.filter((item) => item.category === "regular").reduce((sum, item) => sum + item.value, 0), [magneticBreakdown]);
@@ -668,6 +785,83 @@ export default function Home() {
     }
     setError("Incorrect Location Simulator password.");
   };
+
+  const resetFieldUploaderForm = () => {
+    setEditingFieldId(null);
+    setFieldNameInput("");
+    setFieldIntensityInput("5000");
+    setFieldRangeInput("100");
+    setFieldVisibility("private");
+    setFieldStartTimeInput("");
+    setFieldEndTimeInput("");
+  };
+
+  const submitFieldUploader = () => {
+
+    const basePosition = activePosition;
+    if (!basePosition) {
+      setError("Need an active location before uploading a field.");
+      return;
+    }
+
+    const maxIntensity = Number(fieldIntensityInput);
+    const maxRangeMeters = Number(fieldRangeInput);
+
+    if (!fieldNameInput.trim()) {
+      setError("Field name is required.");
+      return;
+    }
+
+    if (Number.isNaN(maxIntensity) || maxIntensity <= 0 || maxIntensity > MAX_UPLOADED_INTENSITY) {
+      setError(`Field intensity must be between 1 and ${MAX_UPLOADED_INTENSITY}.`);
+      return;
+    }
+
+    if (Number.isNaN(maxRangeMeters) || maxRangeMeters <= 0 || maxRangeMeters > MAX_UPLOADED_RANGE_METERS) {
+      setError(`Maximum intensity range must be between 1 and ${MAX_UPLOADED_RANGE_METERS} meters.`);
+      return;
+    }
+
+    if ((fieldStartTimeInput && !fieldEndTimeInput) || (!fieldStartTimeInput && fieldEndTimeInput)) {
+      setError("Set both start and end time, or leave both empty.");
+      return;
+    }
+
+    const payload: UploadedSecretField = {
+      id: editingFieldId ?? `uploaded-${Date.now()}`,
+      name: fieldNameInput.trim(),
+      center: basePosition,
+      maxIntensity,
+      maxRangeMeters,
+      visibility: fieldVisibility,
+      startTime: fieldStartTimeInput,
+      endTime: fieldEndTimeInput
+    };
+
+    setUploadedFields((prev) => {
+      if (!editingFieldId) return [payload, ...prev];
+      return prev.map((item) => (item.id === editingFieldId ? payload : item));
+    });
+
+    setError("");
+    resetFieldUploaderForm();
+  };
+
+  const editUploadedField = (field: UploadedSecretField) => {
+    setEditingFieldId(field.id);
+    setFieldNameInput(field.name);
+    setFieldIntensityInput(field.maxIntensity.toString());
+    setFieldRangeInput(field.maxRangeMeters.toString());
+    setFieldVisibility(field.visibility);
+    setFieldStartTimeInput(field.startTime);
+    setFieldEndTimeInput(field.endTime);
+  };
+
+  const removeUploadedField = (fieldId: string) => {
+    setUploadedFields((prev) => prev.filter((item) => item.id !== fieldId));
+    if (editingFieldId === fieldId) resetFieldUploaderForm();
+  };
+
 
   const closeStartupPopup = () => {
     setSoundEnabled(startupSoundToggle);
@@ -948,6 +1142,64 @@ export default function Home() {
               Use Queen Charlotte Burial Place
             </button>
           </div>}
+
+          {simulatorUnlocked && (
+            <section className="teleport">
+              <h3>Secret Field Uploader</h3>
+              <p className="badge">Designated storage: browser local storage</p>
+              <div className="password-lock">
+                <label>
+                  Field name
+                  <input value={fieldNameInput} onChange={(event) => setFieldNameInput(event.target.value)} placeholder="My secret field" />
+                </label>
+                <label>
+                  Field intensity max (x, max 50,000)
+                  <input value={fieldIntensityInput} onChange={(event) => setFieldIntensityInput(event.target.value)} inputMode="numeric" />
+                </label>
+                <label>
+                  Maximum intensity range (y meters, max 100m)
+                  <input value={fieldRangeInput} onChange={(event) => setFieldRangeInput(event.target.value)} inputMode="decimal" />
+                </label>
+                <label>
+                  Visibility
+                  <select value={fieldVisibility} onChange={(event) => setFieldVisibility(event.target.value as "public" | "private")}>
+                    <option value="private">Visible to me only</option>
+                    <option value="public">Public</option>
+                  </select>
+                </label>
+                <label>
+                  Start time PST (optional)
+                  <input type="time" value={fieldStartTimeInput} onChange={(event) => setFieldStartTimeInput(event.target.value)} />
+                </label>
+                <label>
+                  End time PST (optional)
+                  <input type="time" value={fieldEndTimeInput} onChange={(event) => setFieldEndTimeInput(event.target.value)} />
+                </label>
+                <button type="button" onClick={submitFieldUploader}>{editingFieldId ? "Save field changes" : "Upload field"}</button>
+                {editingFieldId && (
+                  <button type="button" onClick={resetFieldUploaderForm}>Cancel editing</button>
+                )}
+              </div>
+
+              {uploadedFields.length > 0 && (
+                <div className="password-lock">
+                  <strong>Uploaded fields</strong>
+                  {uploadedFields.map((field) => (
+                    <div key={field.id} className="stats">
+                      <p><strong>{field.name}</strong> <span className="badge">{field.visibility}</span></p>
+                      <p>Center: {field.center.lat.toFixed(6)}, {field.center.lon.toFixed(6)}</p>
+                      <p>x: {field.maxIntensity} | y: {field.maxRangeMeters}m</p>
+                      <p>Schedule: {field.startTime && field.endTime ? `${field.startTime}-${field.endTime} PST (±5m fades)` : "Always on"}</p>
+                      <div className="preset-row">
+                        <button type="button" onClick={() => editUploadedField(field)}>Edit</button>
+                        <button type="button" onClick={() => removeUploadedField(field.id)}>Delete</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
           {simulatorUnlocked && <label>
             Latitude
             <input value={simLatInput} onChange={(e) => setSimLatInput(e.target.value)} placeholder="35.22867647481079" />
