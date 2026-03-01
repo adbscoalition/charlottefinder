@@ -781,10 +781,6 @@ export default function Home() {
     if (animatedFieldStrength >= 200000) return 1;
     return (animatedFieldStrength - 15000) / (200000 - 15000);
   }, [animatedFieldStrength]);
-  const orbScale = useMemo(
-    () => 1 + Math.min(animatedFieldStrength / 18000, 0.2) + Math.sin(refreshTick * 1.7) * (animatedFieldStrength >= 150000 ? 0.08 : 0.03),
-    [animatedFieldStrength, refreshTick]
-  );
   const backdropDriftSeconds = useMemo(() => Math.max(16 - Math.min(animatedFieldStrength / 1100, 11), 4), [animatedFieldStrength]);
   const isLoadingField = !hasInitialFix && !simulatedPosition && !spoofActive && !error;
   const geolocationDeniedView = geolocationDenied && !simulatedPosition && !spoofActive;
@@ -1096,9 +1092,7 @@ export default function Home() {
                 ["--ring-color" as string]: pulseRingColor,
                 ["--ring-glow" as string]: rgbToCss(colorFromStops(animatedFieldStrength, PULSE_RING_STOPS), 0.85),
                 ["--shake-distance" as string]: `${destabilizedState ? Math.max(ringShake, 2.6) : ringShake}px`,
-                ["--pulse-speed" as string]: pulsesPerSecond > 0 ? `${Math.max(1 / pulsesPerSecond, 0.12)}s` : "1.2s",
                 ["--meter-speed" as string]: `${Math.max(0.25, 0.8 - Math.min(animatedFieldStrength / 20000, 0.5))}s`,
-                transform: `scale(${orbScale})`,
                 animationPlayState: pulsesPerSecond > 0 || isLoadingField ? "running" : "paused",
                 opacity: animatedFieldStrength <= 0 ? 0.8 : 1
               }}

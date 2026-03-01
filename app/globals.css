@@ -275,8 +275,7 @@ h2 {
   --ring-color: #94a3b8;
   --ring-glow: rgba(148, 163, 184, 0.8);
   --shake-distance: 0px;
-  --pulse-speed: 1.2s;
-  animation: field-orb-pulse var(--pulse-speed) ease-in-out infinite, field-jitter 0.12s ease-in-out infinite;
+  animation: field-jitter 0.12s ease-in-out infinite;
 }
 
 .field-ring {
@@ -374,9 +373,9 @@ h2 {
 }
 
 .field-orb-destabilized {
-  animation-duration: calc(var(--pulse-speed) * 0.5), 0.06s;
+  animation-duration: 0.06s;
   filter: hue-rotate(0deg) saturate(1.4);
-  animation-name: field-orb-pulse, field-jitter, hue-chaos;
+  animation-name: field-jitter, hue-chaos;
 }
 
 .field-value-rainbow {
@@ -408,18 +407,6 @@ h2 {
 .field-core.is-loading .field-label,
 .field-core.is-loading .field-status {
   animation: loading-pulse 1.25s ease-in-out infinite;
-}
-
-@keyframes field-orb-pulse {
-  0%,
-  100% {
-    transform: scale(0.82);
-    opacity: 0.8;
-  }
-  50% {
-    transform: scale(1.02);
-    opacity: 1;
-  }
 }
 
 @keyframes field-jitter {
