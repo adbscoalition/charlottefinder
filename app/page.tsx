@@ -1237,7 +1237,7 @@ export default function Home() {
                 <p>Center: {field.center.lat.toFixed(6)}, {field.center.lon.toFixed(6)}</p>
                 <p>x: {field.maxIntensity} | y: {field.maxRangeMeters}m</p>
                 <p>Schedule: {field.startTime && field.endTime ? `${field.startTime}-${field.endTime} PST (±5m fades)` : "Always on"}</p>
-                <div className="preset-row">
+                <div className="preset-row field-action-buttons">
                   <button type="button" onClick={() => editUploadedField(field)}>Edit</button>
                   <button type="button" onClick={() => removeUploadedField(field.id)}>Delete</button>
                 </div>

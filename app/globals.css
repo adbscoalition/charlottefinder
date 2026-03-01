@@ -454,6 +454,10 @@ h2 {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.field-action-buttons {
+  grid-template-columns: 1fr;
+}
+
 @media (max-width: 520px) {
   .preset-row,
   .target-selector {
