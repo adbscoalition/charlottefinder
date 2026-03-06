@@ -208,6 +208,24 @@ h2 {
   margin-bottom: 0.35rem;
 }
 
+.ocharlotted-link {
+  width: min(500px, 94vw);
+  margin-top: 0.15rem;
+  margin-bottom: 0.8rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  text-decoration: none;
+}
+
+.ocharlotted-link img {
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 999px;
+  object-fit: cover;
+}
+
 
 .target-list {
   margin-top: 1rem;

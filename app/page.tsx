@@ -1194,6 +1194,19 @@ export default function Home() {
         Sound: {soundEnabled ? "On" : "Off"}
       </button>
 
+      <a
+        className="sim-toggle ocharlotted-link"
+        href="https://ocharlotted.com"
+        target="_blank"
+        rel="noreferrer"
+      >
+        <img
+          src="https://i.ibb.co/h1wBpKQy/Chat-GPT-Image-Mar-5-2026-05-26-00-PM.png"
+          alt="OCharlotteD icon"
+        />
+        Back to OCharlotteD
+      </a>
+
       {toTarget && (
         <section className="stats">
           <p>
