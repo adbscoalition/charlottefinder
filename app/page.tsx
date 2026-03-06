@@ -1169,7 +1169,7 @@ export default function Home() {
           {geolocationDeniedView ? "✕" : isLoadingField ? "..." : formatField(animatedFieldStrength)}
         </p>
         <p className="field-label">CLT Magnetic Field™</p>
-        <p className="field-status">{geolocationDeniedView ? "Where... am i?" : isLoadingField ? "Calibrating magnetic sensors..." : statusMessage}</p>
+        <p className="field-status">{geolocationDeniedView ? "User/browser denied location." : isLoadingField ? "Calibrating magnetic sensors..." : statusMessage}</p>
       </section>
 
       <details className="target-list" open>
@@ -1207,22 +1207,28 @@ export default function Home() {
         Back to OCharlotteD
       </a>
 
-      {toTarget && (
+      {(toTarget || geolocationDeniedView) && (
         <section className="stats">
+          {!geolocationDeniedView && (
+            <p>
+              <strong>Tracked location:</strong> {activeTarget.label}
+            </p>
+          )}
           <p>
-            <strong>Tracked location:</strong> {activeTarget.label}
+            <strong>Distance:</strong>{" "}
+            <span className="stat-number">{geolocationDeniedView ? "99.99 trillion light millennia" : `${toTarget?.distance.toFixed(2)} km`}</span>
           </p>
           <p>
-            <strong>Distance:</strong> <span className="stat-number">{toTarget.distance.toFixed(2)}</span> km
+            <strong>Heading:</strong>{" "}
+            <span className="stat-number">{geolocationDeniedView ? "365.01 degrees" : `${toTarget?.bearing.toFixed(2)}°`}</span>
           </p>
-          <p>
-            <strong>Heading:</strong> <span className="stat-number">{toTarget.bearing.toFixed(2)}°</span>
-          </p>
-          {simulatedPosition && <p className="badge">Simulator active (using simulated location)</p>}
-          {spoofActive && <p className="badge">Secret teleport spoof active</p>}
+          {!geolocationDeniedView && simulatedPosition && <p className="badge">Simulator active (using simulated location)</p>}
+          {!geolocationDeniedView && spoofActive && <p className="badge">Secret teleport spoof active</p>}
         </section>
       )}
 
+      {!geolocationDeniedView && (
+        <>
       <button className="sim-toggle sim-toggle-bottom" type="button" onClick={() => setSimulatorOpen((prev) => !prev)}>
         {simulatorOpen ? "Hide" : "Open"} Location Simulator
       </button>
@@ -1311,7 +1317,11 @@ export default function Home() {
       )}
 
 
-      <section className="teleport">
+      </>
+      )}
+
+      {!geolocationDeniedView && (
+        <section className="teleport">
         <h3>Secret Field Uploader</h3>
         <p className="badge">Designated storage: shared browser local storage list</p>
         <div className="password-lock">
@@ -1376,9 +1386,10 @@ export default function Home() {
             <button type="button" onClick={resetFieldUploaderForm}>Cancel editing</button>
           )}
         </div>
-      </section>
+        </section>
+      )}
 
-      {uploadedFields.length > 0 && (
+      {uploadedFields.length > 0 && !geolocationDeniedView && (
         <section className="teleport">
           <details className="created-fields-list" open>
             <summary>Created Secret Fields ({uploadedFields.length})</summary>
