@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Signal Calculator · Charlotte Dynamics</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div id="entryLoader" class="loader">
+      <div class="loader__core">
+        <p class="eyebrow">Field Lab</p>
+        <h2>Priming CLT-6 Calculator</h2>
+        <div class="loader__bar"><span></span></div>
+      </div>
+    </div>
+    <header class="site-header">
+      <a class="brand" href="index.html"
+        ><span class="brand__mark">CLT</span
+        ><span
+          >Charlotte Dynamics<span class="brand__sub"
+            >Signal calculator</span
+          ></span
+        ></a
+      ><button id="navToggle" class="nav-toggle" aria-controls="primaryNav">
+        Menu
+      </button>
+      <nav id="primaryNav" class="primary-nav">
+        <a class="nav-link" href="index.html">Command Deck</a
+        ><a class="nav-link" href="launch.html">Launch Ports</a
+        ><a class="nav-link" href="instructions.html">Protocol Copy</a
+        ><a class="nav-link" href="detector.html">Live Detector</a
+        ><a class="nav-link" aria-current="page" href="calculator.html"
+          >Signal Calculator</a
+        ><a class="nav-link" href="questions.html">Questions</a
+        ><a class="nav-link" href="safety.html">Safety Notes</a>
+      </nav>
+    </header>
+    <main class="main" id="fieldCalculatorApp">
+      <section class="hero">
+        <div>
+          <p class="eyebrow">CLT-6 personal signal generator</p>
+          <h1>Signal <span class="gradient-text">Calculator</span></h1>
+          <p class="lede">
+            Enter legal signal name, N (% named Charlotte), appearance modifier
+            M, surname rarity P, and regional rarity Q to render fictional CLT,
+            tungsten, and band tables.
+          </p>
+        </div>
+        <div class="panel">
+          <p class="disclaimer">
+            Legal signal name must be exactly Charlotte for a non-zero fictional
+            CLT output.
+          </p>
+        </div>
+      </section>
+      <section class="section panel">
+        <div class="form-grid">
+          <label>Legal signal name<input id="fcName" value="Charlotte" /></label
+          ><label
+            >N: % named Charlotte<input
+              id="fcRank"
+              type="number"
+              step="0.0001"
+              value="0.15" /></label
+          ><label
+            >Appearance modifier M (0–10)<input
+              id="fcAppearance"
+              type="number"
+              min="0"
+              max="10"
+              step="0.1"
+              value="7" /></label
+          ><label
+            >Surname rarity P (1:x)<input
+              id="fcSurnameP1"
+              type="number"
+              value="25000" /></label
+          ><label
+            >Regional rarity Q (1:x)<input
+              id="fcRegionalQ"
+              type="number"
+              value="900"
+          /></label>
+        </div>
+        <div class="actions">
+          <button id="fcCalculate" class="btn primary">
+            Calculate CLT-6 Signal
+          </button>
+        </div>
+      </section>
+      <section id="fcResult" class="section grid"></section>
+    </main>
+    <footer class="footer">
+      CLT-6 calculator outputs are fictional lore, not real science.
+    </footer>
+    <script src="app.js"></script>
+  </body>
+</html>
