@@ -156,14 +156,17 @@ function rows(target, data, tungstenMode = false) {
 function loadScenarios() {
   try {
     return JSON.parse(
-      localStorage.getItem("charlotteDynamicsScenarios") || "[]",
+      localStorage.getItem("operationCharlotteDynamicsScenarios") || "[]",
     );
   } catch {
     return [];
   }
 }
 function saveScenarios(items) {
-  localStorage.setItem("charlotteDynamicsScenarios", JSON.stringify(items));
+  localStorage.setItem(
+    "operationCharlotteDynamicsScenarios",
+    JSON.stringify(items),
+  );
 }
 function scenarioActive(item) {
   if (!item.day && !item.time) return true;

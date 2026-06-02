@@ -3,7 +3,13 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Launch Ports · Charlotte Dynamics</title>
+    <title>Launch Ports · Operation Charlotte Dynamics</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Gravitas+One&family=Public+Sans:ital,wght@0,100..900;1,100..900&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -18,22 +24,41 @@
       <a class="brand" href="index.html"
         ><span class="brand__mark">CLT</span
         ><span
-          >Charlotte Dynamics<span class="brand__sub"
+          >Operation Charlotte Dynamics<span class="brand__sub"
             >Persona systems</span
           ></span
         ></a
-      ><button id="navToggle" class="nav-toggle" aria-controls="primaryNav">
+      ><button
+        id="navToggle"
+        class="nav-toggle"
+        aria-controls="primaryNav"
+        aria-expanded="false"
+      >
         Menu
       </button>
       <nav id="primaryNav" class="primary-nav">
-        <a class="nav-link" href="index.html">Command Deck</a
-        ><a class="nav-link" aria-current="page" href="launch.html"
-          >Launch Ports</a
-        ><a class="nav-link" href="instructions.html">Protocol Copy</a
-        ><a class="nav-link" href="detector.html">Live Detector</a
-        ><a class="nav-link" href="calculator.html">Signal Calculator</a
-        ><a class="nav-link" href="questions.html">Questions</a
-        ><a class="nav-link" href="safety.html">Safety Notes</a>
+        <a class="nav-link" href="index.html">Command Deck</a>
+        <div class="nav-group">
+          <button class="nav-parent">Persona Systems</button>
+          <div class="nav-menu">
+            <a aria-current="page" href="launch.html">Launch Ports</a>
+            <a href="instructions.html">Protocol Copy</a>
+          </div>
+        </div>
+        <div class="nav-group">
+          <button class="nav-parent">Field Lab</button>
+          <div class="nav-menu">
+            <a href="detector.html">Live Detector</a>
+            <a href="calculator.html">Signal Calculator</a>
+          </div>
+        </div>
+        <div class="nav-group">
+          <button class="nav-parent">Archive</button>
+          <div class="nav-menu">
+            <a href="questions.html">Questions</a>
+            <a href="safety.html">Safety Notes</a>
+          </div>
+        </div>
       </nav>
     </header>
     <main class="main">
