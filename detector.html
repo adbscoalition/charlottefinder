@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Live Detector · Operation Charlotte Dynamics</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Gravitas+One&family=Public+Sans:ital,wght@0,100..900;1,100..900&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div id="entryLoader" class="loader">
+      <div class="loader__core">
+        <p class="eyebrow">Field Lab</p>
+        <h2>Synchronizing Detector</h2>
+        <div class="loader__bar"><span></span></div>
+      </div>
+    </div>
+    <header class="site-header">
+      <a class="brand" href="index.html"
+        ><span class="brand__mark">CLT</span
+        ><span
+          >Operation Charlotte Dynamics<span class="brand__sub"
+            >Live detector</span
+          ></span
+        ></a
+      ><button
+        id="navToggle"
+        class="nav-toggle"
+        aria-controls="primaryNav"
+        aria-expanded="false"
+      >
+        Menu
+      </button>
+      <nav id="primaryNav" class="primary-nav">
+        <a class="nav-link" href="index.html">Command Deck</a>
+        <div class="nav-group">
+          <button class="nav-parent">Persona Systems</button>
+          <div class="nav-menu">
+            <a href="launch.html">Launch Ports</a>
+            <a href="instructions.html">Protocol Copy</a>
+          </div>
+        </div>
+        <div class="nav-group">
+          <button class="nav-parent">Field Lab</button>
+          <div class="nav-menu">
+            <a aria-current="page" href="detector.html">Live Detector</a>
+            <a href="calculator.html">Signal Calculator</a>
+          </div>
+        </div>
+        <div class="nav-group">
+          <button class="nav-parent">Archive</button>
+          <div class="nav-menu">
+            <a href="questions.html">Questions</a>
+            <a href="safety.html">Safety Notes</a>
+          </div>
+        </div>
+      </nav>
+    </header>
+    <main id="cltSystemApp" class="main">
+      <section class="hero">
+        <div>
+          <p class="eyebrow">CLT field console</p>
+          <h1>Live <span class="gradient-text">Detector</span></h1>
+          <p class="lede">
+            Track fictional CLT field status with geolocation, manual fallback
+            scans, source contribution tables, tungsten estimates, telemetry
+            logs, pinned scans, and custom scenario tools.
+          </p>
+          <div class="actions">
+            <button id="startGeo" class="btn primary">
+              Start Live Geolocation</button
+            ><button id="pinScan" class="btn">Pin Precision Scan</button
+            ><button id="copyTelemetry" class="btn">Copy Telemetry</button>
+          </div>
+        </div>
+        <aside class="panel">
+          <div class="grid grid-2">
+            <div class="metric">
+              <span>Current CLT readout</span
+              ><strong id="cltTotalField">0 CLT</strong>
+            </div>
+            <div class="metric">
+              <span>Tungsten estimate</span
+              ><strong id="cltTungsten">0 mg/m³</strong>
+            </div>
+          </div>
+          <p id="positionStatus">Awaiting scan.</p>
+          <p>GPS accuracy: <strong id="gpsAccuracy">unknown</strong></p>
+        </aside>
+      </section>
+      <section class="section grid grid-2">
+        <div class="panel">
+          <h2>Fallback Coordinate Scan</h2>
+          <div class="form-grid">
+            <label
+              >Latitude<input
+                id="manualLat"
+                type="number"
+                step="0.000001"
+                value="35.2271" /></label
+            ><label
+              >Longitude<input
+                id="manualLon"
+                type="number"
+                step="0.000001"
+                value="-80.8431"
+            /></label>
+          </div>
+          <button id="manualScan" class="btn primary">Run Manual Scan</button>
+        </div>
+        <div class="panel">
+          <h2>Nearest Fields</h2>
+          <p>
+            Nearest named place field: <strong id="nearestNamedPlace">—</strong>
+          </p>
+          <p>
+            Nearest local custom field:
+            <strong id="nearestLocalField">—</strong>
+          </p>
+          <h3>Top contributors</h3>
+          <ul id="cltContributors" class="list"></ul>
+        </div>
+      </section>
+      <section class="section grid grid-2">
+        <div class="panel">
+          <h2>CLT Contribution Table</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Source</th>
+                <th>Type</th>
+                <th>Band</th>
+                <th>Distance</th>
+                <th>Contribution</th>
+              </tr>
+            </thead>
+            <tbody id="cltContributionTable"></tbody>
+          </table>
+        </div>
+        <div class="panel">
+          <h2>Tungsten Contribution Table</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Source</th>
+                <th>Type</th>
+                <th>Band</th>
+                <th>Distance</th>
+                <th>Estimate</th>
+              </tr>
+            </thead>
+            <tbody id="tungstenContributionTable"></tbody>
+          </table>
+        </div>
+      </section>
+      <section class="section grid grid-2">
+        <div class="panel">
+          <h2>Telemetry Stream</h2>
+          <pre id="telemetryStream" class="telemetry"></pre>
+        </div>
+        <div class="panel">
+          <h2>Pinned Scan Sheet</h2>
+          <ul id="scanSheetList" class="list">
+            <li>No precision scans pinned yet.</li>
+          </ul>
+        </div>
+      </section>
+      <section class="section panel">
+        <p class="eyebrow">Custom scenario studio</p>
+        <h2>Local CLT Field Uploader</h2>
+        <form id="scenarioForm" onsubmit="return false;">
+          <input id="fieldEditIndex" type="hidden" />
+          <div class="form-grid">
+            <label
+              >Scenario name<input
+                id="fieldName"
+                placeholder="Charlotte resonance lab" /></label
+            ><label
+              >CLT intensity<input
+                id="fieldClt"
+                type="number"
+                value="450" /></label
+            ><label
+              >Field type<select id="fieldType">
+                <option>Type 1</option>
+                <option>Type 1S</option>
+                <option>Type 1R</option>
+                <option>Type R</option>
+              </select></label
+            ><label id="type1sControl" hidden
+              >Type 1S custom M-band (meters)<input
+                id="fieldCustomMBand"
+                type="number"
+                placeholder="40" /></label
+            ><label id="typeRControl" hidden
+              >Type R detection radius (km)<input
+                id="fieldDetectionRange"
+                type="number"
+                step="0.1"
+                placeholder="1.5" /></label
+            ><label
+              >Latitude<input
+                id="fieldLat"
+                type="number"
+                step="0.000001" /></label
+            ><label
+              >Longitude<input
+                id="fieldLon"
+                type="number"
+                step="0.000001" /></label
+            ><label
+              >Optional schedule day<select id="fieldScheduleDay">
+                <option value="">Any day</option>
+                <option>Monday</option>
+                <option>Tuesday</option>
+                <option>Wednesday</option>
+                <option>Thursday</option>
+                <option>Friday</option>
+                <option>Saturday</option>
+                <option>Sunday</option>
+              </select></label
+            ><label
+              >Optional schedule hour<input id="fieldScheduleTime" type="time"
+            /></label>
+          </div>
+          <div class="actions">
+            <button id="useDeviceForField" class="btn">
+              Use Device Position</button
+            ><button id="clearFieldCoords" class="btn">Clear Coordinates</button
+            ><button id="fieldSave" class="btn primary">Save Scenario</button
+            ><button id="fieldReset" class="btn">Reset</button>
+          </div>
+        </form>
+        <h3>Saved local scenarios</h3>
+        <ul id="uploadedFieldList" class="list"></ul>
+      </section>
+    </main>
+    <footer class="footer">
+      Detector readings are fictional CLT lore and are not scientific
+      measurements.
+    </footer>
+    <script src="app.js"></script>
+  </body>
+</html>
